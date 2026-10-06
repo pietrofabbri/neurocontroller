@@ -1,0 +1,9 @@
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+# GameMaker: runner binari e build locali
+YoYo Runner.app/
+*.zip
+# dati EEG grezzi: non versionare senza verifica consenso/anonimizzazione (vedi docs/05)
+data/raw/
