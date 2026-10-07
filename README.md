@@ -64,7 +64,25 @@ python3 -m neurocontroller live --profile P01 --udp    # riconosce lo stato e co
 Serve solo Python >= 3.8 (con il sensore vero anche `pip install pyserial`). I profili restano
 sul computer in `data/profiles/` e **non** vanno in Git. Il codice del sensore reale e' ancora
 **non verificato**: il formato seriale e i 250 campioni/s sono assunzioni (sezione 6 del
-documento 08). Test: `python3 -m unittest discover -s tests`.
+documento 08).
+
+## Test e integrazione continua (GitHub Actions)
+
+```
+python3 -m unittest discover -s tests     # tutti i test (circa 30 secondi, nessun sensore)
+python3 tools/check_repo.py               # nessun dato personale tracciato da Git
+```
+
+Il workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) li esegue a ogni push su
+`main` e a ogni pull request, su **Linux, Windows e macOS** e con piu' versioni di Python
+(3.8 su Ubuntu 22.04, 3.9 e 3.13 ovunque, 3.11 su Linux), piu' una prova completa senza sensore
+(`demo`) e il controllo `check_repo.py`. Non usa segreti ne' permessi di scrittura. L'esito si
+vede nella scheda **Actions** del repository.
+
+Cosa la CI **non** copre: il sensore EEG e GameMaker non girano li'. I test usano segnale
+simulato e controllano porta e comandi del gioco **leggendo i file `.gml` come testo**: che il
+gioco, aperto in GameMaker, reagisca davvero resta una prova manuale (`docs/04-roadmap-mvp.md`,
+tappa M0). Il controllo `check_repo.py` esiste perche' `.gitignore` si aggira con `git add -f`.
 
 ## Come provarlo (senza sensore)
 

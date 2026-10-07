@@ -162,6 +162,10 @@ salga davvero a occhi chiusi (messaggio nel report).
   `python3 -m unittest discover -s tests`).
 - Che il lato Python parli al gioco come il gioco si aspetta: la porta e le lettere sono
   confrontate **con i file `.gml`** del gioco (`tests/test_live_and_link.py`).
+- Che la suite passi su **Python 3.8, 3.9, 3.11, 3.12 e 3.13 su Linux** (eseguita in locale
+  il 7 ottobre 2026). Windows e macOS sono coperti dalla CI (`.github/workflows/ci.yml`):
+  **non sono stati eseguiti prima della pubblicazione del workflow**, quindi vanno guardati
+  nella scheda Actions al primo giro.
 
 **NON verificato:**
 

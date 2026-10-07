@@ -1,0 +1,8 @@
+# Tiene aggiornate le versioni delle azioni usate dai workflow (actions/checkout, ...):
+# apre da sola una pull request quando ne esce una nuova. Non tocca il codice del progetto.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

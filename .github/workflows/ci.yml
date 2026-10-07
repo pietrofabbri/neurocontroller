@@ -1,0 +1,67 @@
+# Integrazione continua: a ogni push su main e a ogni pull request esegue i test su
+# Linux, Windows e macOS e controlla che in Git non ci siano dati personali.
+#
+# Non serve nessun segreto e nessun accesso in scrittura: il workflow legge soltanto.
+# Il sensore EEG e GameMaker NON sono coinvolti: i test usano segnale simulato e leggono
+# i file .gml del gioco come testo (vedi docs/08-calibrazione.md, sezione 7).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false   # se una combinazione fallisce, le altre finiscono comunque: si vede dove
+      matrix:
+        include:
+          # 3.8 e' il minimo dichiarato. ubuntu-22.04 perche' li' 3.8 e' sicuramente disponibile;
+          # su macOS (arm64) setup-python non offre la 3.8, quindi li' il minimo testato e' 3.9.
+          - {os: ubuntu-22.04,  python: "3.8"}
+          - {os: ubuntu-latest, python: "3.9"}
+          - {os: ubuntu-latest, python: "3.11"}
+          - {os: ubuntu-latest, python: "3.13"}
+          - {os: windows-latest, python: "3.9"}
+          - {os: windows-latest, python: "3.13"}
+          - {os: macos-latest,  python: "3.9"}
+          - {os: macos-latest,  python: "3.13"}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Versione di Python
+        run: python --version
+
+      - name: Test automatici
+        run: python -m unittest discover -s tests -v
+
+      - name: Prova completa senza sensore (demo con segnale simulato)
+        run: python -m neurocontroller demo --duration-scale 0.3
+
+  privacy:
+    name: nessun dato personale in Git
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Controllo dei file tracciati
+        run: python tools/check_repo.py
