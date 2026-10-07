@@ -5,5 +5,9 @@ __pycache__/
 # GameMaker: runner binari e build locali
 YoYo Runner.app/
 *.zip
-# dati EEG grezzi: non versionare senza verifica consenso/anonimizzazione (vedi docs/05)
+# Dati fisiologici di persone (anche se con codice anonimo): NON versionare senza
+# consenso documentato e verifica di anonimizzazione (vedi docs/05-sicurezza-privacy-etica.md).
+# Ignorate: profili di calibrazione, tabelle delle sessioni, campioni grezzi.
 data/raw/
+data/profiles/
+data/sessions/
