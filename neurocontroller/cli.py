@@ -253,7 +253,8 @@ def cmd_live(args: argparse.Namespace, out: Callable[[str], None]) -> int:
     try:
         classifier = StateClassifier(profile, margin=args.margin, smooth=args.smooth)
         runner = LiveRunner(source, classifier, link, hop_fraction=args.hop,
-                            on_update=lambda u: out(_format_update(u)))
+                            on_update=lambda u: out(_format_update(u)),
+                            pace=bool(link) and not source.realtime)
         seconds = args.seconds if args.seconds is not None else (
             sum(s for _, s in script) if script else None)
         runner.run(seconds)

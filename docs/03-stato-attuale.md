@@ -68,3 +68,9 @@ mentale -> coerenza con una condizione -> punteggio, con A che aiuta via musica)
 - La logica dei bordi e' duplicata (script `ball_walls` e dentro l'evento di rete).
 - Il diario si interrompe il 5/05/2026 con una riga "giorno" senza contenuto: gli
   ultimi mesi del lavoro non sono documentati.
+
+## Aggiornamento 07/10/2026 - prova senza sensore con GameMaker
+
+- **Verificato dal docente**: `tools/udp_sim.py send b --count 40` muove l'auto nel gioco aperto in GameMaker (catena Python -> UDP 6510 -> gioco funzionante).
+- **Difetto trovato e corretto**: la `demo` con sorgente simulata inviava tutti i comandi in pochi decimi di secondo (il segnale simulato non e' in tempo reale), quindi l'auto riceveva centinaia di pacchetti insieme e non si vedeva nulla. Ora con `--udp` il modo live procede a tempo reale (1 s di segnale = 1 s vero; `LiveRunner(pace=True)`), coperto da test.
+- **Richiesta aperta**: movimento dolce (tappa M3b in `docs/04-roadmap-mvp.md`).

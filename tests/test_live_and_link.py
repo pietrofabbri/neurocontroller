@@ -163,6 +163,24 @@ class LiveRunnerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 LiveRunner(source, StateClassifier(self.profile), hop_fraction=bad)
 
+    def test_pace_follows_the_signal_clock(self):
+        """Con pace=True i comandi escono a tempo reale (prima uscivano tutti in un istante)."""
+        import time
+        from unittest import mock
+        slept = []
+        with mock.patch("neurocontroller.live.time.sleep", side_effect=slept.append):
+            runner, total = self.runner([("relax", 12)], pace=True)
+            runner.run(total)
+        self.assertTrue(slept)
+        self.assertGreater(sum(slept), 0)
+
+    def test_without_pace_it_never_sleeps(self):
+        from unittest import mock
+        with mock.patch("neurocontroller.live.time.sleep") as sleep:
+            runner, total = self.runner([("relax", 12)])
+            runner.run(total)
+        sleep.assert_not_called()
+
     def test_end_of_file_becomes_live_error(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
