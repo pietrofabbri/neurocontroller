@@ -30,12 +30,14 @@ che scava). Vedi [`docs/02-richieste-originali.md`](docs/02-richieste-originali.
 6. [`docs/06-neuroville-e-fondamenti.md`](docs/06-neuroville-e-fondamenti.md) e [`docs/07-diario-studenti.md`](docs/07-diario-studenti.md) - materiale didattico e storia del lavoro.
 7. [`docs/08-calibrazione.md`](docs/08-calibrazione.md) - **calibrazione per persona**: compiti cognitivi, metodo, cosa e' verificato e cosa no.
 8. [`docs/GLOSSARIO.md`](docs/GLOSSARIO.md) - termini.
+9. [`web/`](web/README.md) - **versione web (solo progettazione)**: decisioni, vincoli, architettura, pulizia del segnale, piano a tappe.
 
 ## Struttura del repository
 
 ```
 README.md
 docs/                  documentazione (numerata, vedi sopra)
+web/                   progettazione della versione web (solo documentazione, nessun codice)
 game/BLeppo2/          progetto GameMaker (IDE 2024.14.4.222)
 neurocontroller/       calibrazione per persona + riconoscimento dello stato + invio al gioco
 tools/udp_sim.py       simulatore del bridge: prova il gioco senza sensore

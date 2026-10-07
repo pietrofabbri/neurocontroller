@@ -55,3 +55,10 @@ progetto a coincidere con la scheda originale.
 - Ogni modifica funzionale aggiorna `03-stato-attuale.md`.
 - Nessun nome di studente nel repository: si usano i **ruoli** (hardware, audio,
   deployment, game design).
+
+## 5. Percorso parallelo: versione web (solo progettazione)
+
+La versione web (`web/`) e' un secondo binario, con tappe proprie **W0-W4** (`web/04-piano-e-accettazione.md`),
+vincoli `V-xx` e decisioni aperte `WD-x`. **Non sostituisce** le tappe M0-M6 e non modifica il progetto
+GameMaker. Le decisioni D1-D6 qui sopra restano valide per la versione GameMaker; `WD-D` (punteggio) e `WD-F`
+(licenza) riprendono `D4` e `D5`.

@@ -74,3 +74,9 @@ mentale -> coerenza con una condizione -> punteggio, con A che aiuta via musica)
 - **Verificato dal docente**: `tools/udp_sim.py send b --count 40` muove l'auto nel gioco aperto in GameMaker (catena Python -> UDP 6510 -> gioco funzionante).
 - **Difetto trovato e corretto**: la `demo` con sorgente simulata inviava tutti i comandi in pochi decimi di secondo (il segnale simulato non e' in tempo reale), quindi l'auto riceveva centinaia di pacchetti insieme e non si vedeva nulla. Ora con `--udp` il modo live procede a tempo reale (1 s di segnale = 1 s vero; `LiveRunner(pace=True)`), coperto da test.
 - **Richiesta aperta**: movimento dolce (tappa M3b in `docs/04-roadmap-mvp.md`).
+
+## Aggiornamento 08/10/2026 - versione web (solo progettazione)
+
+- **Decisione del docente referente**: la versione web e' un **secondo binario**; il gioco GameMaker non viene toccato (se gli studenti vogliono proseguirlo e' libero); chi cura la documentazione abbandona l'ipotesi di sviluppare ulteriormente GameMaker. Per ora **solo documentazione** in `web/`, nessun codice.
+- **Richiesta aggiunta**: una "bella pulizia" del segnale (palpebre, mascella, rete, contatto), perche' il segnale vero e' molto piu' sporco di quello simulato e non e' mai stato provato con il sensore. Progettata in `web/03-pulizia-del-segnale.md` (rilevatori proposti, protocollo di validazione, criteri di accettazione, limiti); **non implementata**.
+- Nessun requisito `R-xx` cambia stato: la versione web e' tracciata verso i requisiti in `web/01-decisioni-e-vincoli.md`, sezione 3.
