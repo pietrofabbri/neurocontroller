@@ -32,6 +32,25 @@ file non sono ancora stati recuperati.
 | `bridge.py` (seriale -> UDP, 3 uscite) | **Non presente** - da recuperare | Diario 28/04 (creato), 5/05 (3 uscite); `bridge/README.md` |
 | Ricezione UDP e movimento nel gioco | **Presente e leggibile** | `game/BLeppo2/objects/obj_player/` |
 | Simulatore del bridge (per prove senza sensore) | **Aggiunto** in questo repository | `tools/udp_sim.py`, `tests/` |
+| Calibrazione per persona e riconoscimento dello stato (alternativa a `bridge.py`) | **Aggiunto**, provato solo con segnale **simulato** | `neurocontroller/`, `docs/08-calibrazione.md` |
+
+### 1.1 Il pacchetto `neurocontroller/` (nuovo)
+
+Legge il sensore dalla porta seriale, calcola le bande con la FFT, **tara ogni persona
+con una serie di compiti cognitivi** e riconosce lo stato mentale (rilassato /
+concentrato), poi manda al gioco una lettera via UDP nello stesso formato descritto nella
+sezione 2. **Non sostituisce** il lavoro degli studenti: finche' `bridge.py` e il firmware
+non sono recuperati (`bridge/README.md`), e' il modo per avere l'intera catena in
+questo repository. Assume una riga di testo per campione e 250 campioni al secondo:
+**ipotesi da verificare** con il firmware vero (`docs/08-calibrazione.md`, sezione 6).
+
+```
+ Arduino --seriale--> sources.SerialSource --> dsp (FFT, bande) --> profile (stato)
+                                                                        |
+                                              game_link (UDP 6510, 1 lettera + NUL)
+                                                                        v
+                                                              GameMaker obj_player
+```
 
 Storia dell'integrazione secondo il diario: il primo tentativo di collegare Arduino
 a GameMaker con l'estensione di terze parti "yellowafterlife" ha dato "scarsi

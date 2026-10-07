@@ -8,7 +8,10 @@ porta seriale e li inoltra al gioco via UDP.
 Secondo il diario (`docs/07-diario-studenti.md`) il file e' stato creato il
 28/04/2026 e aggiornato il 05/05/2026 per emettere "le onde divise in 3 diverse
 uscite"; si trovava su Google Classroom. **Non e' in questo repository** e non e'
-stato inventato un sostituto: `tools/udp_sim.py` simula solo il lato "uscita".
+stato spacciato per suo un sostituto: `tools/udp_sim.py` simula solo il lato "uscita",
+e il pacchetto `neurocontroller/` (`docs/08-calibrazione.md`) e' una **alternativa
+nuova**, con una calibrazione per persona, che parla al gioco nello stesso formato.
+Quando `bridge.py` verra' recuperato va aggiunto qui cosi' com'e', e confrontato.
 
 ## Cosa deve fare (contratto verso il gioco)
 

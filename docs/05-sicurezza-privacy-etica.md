@@ -55,9 +55,11 @@ Regole di lavoro per questo repository:
 
 1. **Nessun nome di studente** nei file (si usano i ruoli). Le fonti originali con
    i nomi non sono state copiate (vedi `docs/sources/README.md`).
-2. **Nessun dato EEG grezzo identificabile** versionato. La cartella `data/raw/` e'
-   ignorata da Git. In `data/` si mettono solo dati **anonimi** (identificativi tipo
-   `P01`, `P02`), senza data di nascita, nome, classe.
+2. **Nessun dato fisiologico di persone versionato.** `data/raw/` (campioni grezzi),
+   `data/profiles/` (profili di calibrazione) e `data/sessions/` (tabelle delle sessioni)
+   sono ignorate da Git, e un test lo verifica (`tests/test_repo_hygiene.py`). Il programma
+   rifiuta come identificativo un nome di persona: ammette solo codici anonimi `P01`,
+   `P02`... Nei file non vanno mai data di nascita, nome, classe.
 3. Prima di salvare dati su persone minorenni: **consenso informato** documentato
    (cosa si misura, perche', quanto si conserva, chi vede i dati, possibilita' di
    ritirarsi).

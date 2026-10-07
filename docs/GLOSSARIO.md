@@ -20,7 +20,15 @@ Pensato per chi arriva al progetto senza contesto (collega, studente nuovo, altr
 | **Evento Async Networking** | Evento di GameMaker (file `Other_68.gml`) che scatta quando arrivano dati dalla rete. |
 | **MVP** | *Minimum Viable Product*: la versione piu' piccola che funziona; nel progetto, l'idea di crescere a piccoli passi mantenendo sempre un gioco funzionante. |
 | **Giocatore A / Giocatore B** | A: controller tradizionale e musica; B: controller EEG (vedi `02-richieste-originali.md`). |
-| **Stato "concentrato" / "rilassato"** | Le due condizioni mentali richieste a B; la loro definizione tecnica e' una decisione aperta (D2). |
+| **Stato "concentrato" / "rilassato"** | Le due condizioni mentali richieste a B; la loro definizione tecnica (D2) e' stata proposta e implementata per persona (`08-calibrazione.md`), ma non e' ancora validata su EEG vero. |
 | **PNRR** | Piano Nazionale di Ripresa e Resilienza: fonte dei fondi per le attivita' di orientamento in cui nasce il progetto. |
 | **CEN** | Contemplative Education Network, rete citata come possibile fonte di finanziamento. |
 | **Ruoli** | Hardware, Audio design, Deployment, Game design; ciascuno con un responsabile della documentazione. |
+| **Calibrazione** | Breve serie di compiti cognitivi (rilassamento, calcolo mentale, movimenti volontari) con cui il sistema impara come reagisce **quella persona**. Vedi `08-calibrazione.md`. |
+| **Profilo** | Riassunto della calibrazione di una persona (soglie, qualita', codice anonimo). Non contiene campioni grezzi. Vive in `data/profiles/`, fuori da Git. |
+| **Indice E (engagement)** | `ln(beta / (alfa + theta))`: un unico numero per finestra di segnale; sale quando la beta cresce e l'alfa cala. E' un rapporto, quindi indipendente dalla scala del sensore. |
+| **d' (d primo)** | Misura di quanto due distribuzioni (qui: indice E a riposo e nel calcolo) sono separate rispetto alla loro dispersione. Piu' alto = piu' distinguibili. |
+| **Validazione tra blocchi** | Tarare su un blocco e verificare sull'altro, mai sullo stesso: evita di giudicare buona una calibrazione solo perche' riconosce i dati su cui e' stata fatta. |
+| **Effetto Berger** | A occhi chiusi l'alfa aumenta (di norma nettamente) rispetto a occhi aperti. Qui e' usato solo come controllo che il sensore veda un segnale cerebrale. |
+| **Persona simulata** | Segnale sintetico (tipica, debole, nulla) costruito secondo il modello assunto: serve a provare il programma, **non e' EEG** e non prova che il metodo funzioni. |
+| **Livello di qualita'** | Verdetto della calibrazione: *usabile*, *debole* o *non affidabile*. Con un profilo non affidabile la modalita' `live` si rifiuta di partire senza `--force`. |

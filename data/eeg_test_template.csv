@@ -1,1 +1,1 @@
-participant_id,session_date,stimulus,electrode_position,band,peak_hz,peak_value,notes
+participant_id,session_date,stimulus,electrode_position,band,peak_hz,peak_value,mean_rel_power,n_windows,notes

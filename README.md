@@ -6,8 +6,9 @@ collegato a un gioco GameMaker. Realizzato da un gruppo di studenti volontari co
 docente referente, con metodo **MVP incrementale** e quattro ruoli (hardware, audio
 design, deployment, game design).
 
-> **Stato (6 ottobre 2026): prototipo di pipeline funzionante nell'ultimo anello,
-> gioco a due giocatori richiesto dalla scheda NON ancora implementato.**
+> **Stato (7 ottobre 2026): prototipo di pipeline funzionante nell'ultimo anello (sensore ->
+> gioco); calibrazione per persona con compiti cognitivi implementata ma provata solo con
+> segnale SIMULATO; gioco a due giocatori richiesto dalla scheda NON ancora implementato.**
 > Il dettaglio, requisito per requisito, e' in [`docs/03-stato-attuale.md`](docs/03-stato-attuale.md).
 
 ## Cos'e' il gioco richiesto
@@ -27,7 +28,8 @@ che scava). Vedi [`docs/02-richieste-originali.md`](docs/02-richieste-originali.
 4. [`docs/04-roadmap-mvp.md`](docs/04-roadmap-mvp.md) - **come chiudere** (tappe M0-M6, decisioni aperte D1-D6).
 5. [`docs/05-sicurezza-privacy-etica.md`](docs/05-sicurezza-privacy-etica.md) - **limiti scientifici, sicurezza, privacy**: da leggere prima di usarlo in pubblico.
 6. [`docs/06-neuroville-e-fondamenti.md`](docs/06-neuroville-e-fondamenti.md) e [`docs/07-diario-studenti.md`](docs/07-diario-studenti.md) - materiale didattico e storia del lavoro.
-7. [`docs/GLOSSARIO.md`](docs/GLOSSARIO.md) - termini.
+7. [`docs/08-calibrazione.md`](docs/08-calibrazione.md) - **calibrazione per persona**: compiti cognitivi, metodo, cosa e' verificato e cosa no.
+8. [`docs/GLOSSARIO.md`](docs/GLOSSARIO.md) - termini.
 
 ## Struttura del repository
 
@@ -35,13 +37,34 @@ che scava). Vedi [`docs/02-richieste-originali.md`](docs/02-richieste-originali.
 README.md
 docs/                  documentazione (numerata, vedi sopra)
 game/BLeppo2/          progetto GameMaker (IDE 2024.14.4.222)
+neurocontroller/       calibrazione per persona + riconoscimento dello stato + invio al gioco
 tools/udp_sim.py       simulatore del bridge: prova il gioco senza sensore
-tests/                 test del simulatore (unittest, solo libreria standard)
+tests/                 test automatici (unittest, solo libreria standard)
 bridge/                bridge.py (seriale -> UDP)        DA RECUPERARE
 firmware/              firmware Arduino modificato        DA RECUPERARE
 data/                  dati dei test (anonimi) e schema   DA RECUPERARE
 third_party/           licenze e attribuzioni (CC BY 4.0 per gli sprite)
 ```
+
+## Calibrare una persona (il flusso di ogni sessione)
+
+Ogni persona reagisce in modo diverso: prima di giocare si fa una **calibrazione di circa 7
+minuti** con compiti cognitivi (respiro lento, calcolo mentale, movimenti volontari). Il
+programma dice se per *quella persona* il controllo e' **usabile, debole o non affidabile**, e
+si rifiuta di andare avanti se non lo e'. Metodo e limiti: [`docs/08-calibrazione.md`](docs/08-calibrazione.md).
+
+```
+python3 -m neurocontroller demo                        # prova guidata SENZA sensore (segnale simulato)
+python3 -m neurocontroller ports                       # trova la porta dell'Arduino
+python3 -m neurocontroller check                       # il segnale e' sensato?
+python3 -m neurocontroller calibrate                   # calibra la prossima persona (P01, P02...)
+python3 -m neurocontroller live --profile P01 --udp    # riconosce lo stato e comanda il gioco
+```
+
+Serve solo Python >= 3.8 (con il sensore vero anche `pip install pyserial`). I profili restano
+sul computer in `data/profiles/` e **non** vanno in Git. Il codice del sensore reale e' ancora
+**non verificato**: il formato seriale e i 250 campioni/s sono assunzioni (sezione 6 del
+documento 08). Test: `python3 -m unittest discover -s tests`.
 
 ## Come provarlo (senza sensore)
 
