@@ -29,8 +29,7 @@ esterno. Il database contiene solo dati di gioco e codici `Pxx` (V-06); **non** 
 
 `.github/workflows/pages.yml` pubblica **solo `web/app`** (senza `test/`) su GitHub Pages a ogni modifica
 di `web/app`, `neurocontroller/`, `tests/`, **dopo** che unittest (Python + Node) e `check_repo` passano.
-Indirizzo atteso: `https://pietrofabbri.github.io/neurocontroller/`. Se Pages non si attiva da solo:
-Settings -> Pages -> Source = "GitHub Actions". Su https la Web Serial e' utilizzabile (`02`, sez. 5).
+Indirizzo atteso: `https://pietrofabbri.github.io/neurocontroller/`. **Una tantum, a mano:** Settings -> Pages -> Source = "GitHub Actions" (il token del workflow non puo' attivare Pages). Su https la Web Serial e' utilizzabile (`02`, sez. 5).
 
 Sul sito **non c'e' il server**: la pagina se ne accorge (`/api/health`) e usa un **archivio nel browser**
 (`js/archivio_locale.mjs`, `localStorage`), con le stesse regole di validazione del server. Conseguenze:

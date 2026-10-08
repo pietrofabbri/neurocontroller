@@ -26,7 +26,23 @@ class VettoriTests(unittest.TestCase):
         mod = _carica_generatore()
         salvati = json.loads((APP / "test" / "vettori.json").read_text(encoding="utf-8"))
         ora = json.loads(json.dumps({"finestre": mod.finestre(), "classificatore": mod.classificatore()}))
-        self.assertEqual(salvati, ora, "rigenerare con: python3 tools/genera_vettori_web.py")
+        # Non si confronta bit per bit: sin() e sum() differiscono di pochissimo tra sistemi e versioni di Python
+        # (per esempio sum() e' piu' preciso dalla 3.12). Una deriva vera dell'algoritmo e' molto piu' grande.
+        self._vicini(salvati, ora, "vettori")
+
+    def _vicini(self, a, b, path):
+        if isinstance(a, dict):
+            self.assertEqual(sorted(a), sorted(b), path)
+            for k in a:
+                self._vicini(a[k], b[k], path + "." + k)
+        elif isinstance(a, list):
+            self.assertEqual(len(a), len(b), path)
+            for i, (x, y) in enumerate(zip(a, b)):
+                self._vicini(x, y, "%s[%d]" % (path, i))
+        elif isinstance(a, (int, float)) and not isinstance(a, bool):
+            self.assertAlmostEqual(a, b, delta=1e-4 + 1e-4 * abs(a), msg="%s: rigenerare con tools/genera_vettori_web.py" % path)
+        else:
+            self.assertEqual(a, b, path)
 
 
 @unittest.skipUnless(NODE, "Node non installato")

@@ -1,5 +1,6 @@
 # Pubblica la versione web (la talpa) su GitHub Pages, solo dopo che le prove passano.
 # Sul sito non c'e' il server locale: la pagina salva le partite nel browser di chi gioca (web/05-talpa-w0.md).
+# PRIMA VOLTA: Settings -> Pages -> Source = "GitHub Actions" (il token del workflow non puo' attivare Pages).
 # Si pubblica SOLO web/app (senza la cartella test). Nessun segreto e nessun dato personale coinvolti.
 name: Pubblica la talpa
 
@@ -48,8 +49,6 @@ jobs:
           rm -rf _sito/test
           touch _sito/.nojekyll
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _sito
