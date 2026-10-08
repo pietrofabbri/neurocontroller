@@ -25,6 +25,20 @@ stesso**. Cio' che V-04 vieta resta vietato: **nessun dato esce dal computer**, 
 esterno. Il database contiene solo dati di gioco e codici `Pxx` (V-06); **non** il segnale grezzo
 (V-05). Chi gioca puo' essere cancellato con tutte le sue partite (pulsante in "Gestione dei giocatori").
 
+## 2b. Pubblicazione su GitHub Pages (WD-A, 9 ottobre 2026)
+
+`.github/workflows/pages.yml` pubblica **solo `web/app`** (senza `test/`) su GitHub Pages a ogni modifica
+di `web/app`, `neurocontroller/`, `tests/`, **dopo** che unittest (Python + Node) e `check_repo` passano.
+Indirizzo atteso: `https://pietrofabbri.github.io/neurocontroller/`. Se Pages non si attiva da solo:
+Settings -> Pages -> Source = "GitHub Actions". Su https la Web Serial e' utilizzabile (`02`, sez. 5).
+
+Sul sito **non c'e' il server**: la pagina se ne accorge (`/api/health`) e usa un **archivio nel browser**
+(`js/archivio_locale.mjs`, `localStorage`), con le stesse regole di validazione del server. Conseguenze:
+le partite restano **nel browser di chi gioca**, non sono condivise tra computer, si perdono se si
+cancellano i dati del sito (il CSV scaricabile e' la copia); la classifica e' quindi **personale**. Per
+una classifica comune a piu' persone serve il server locale su un solo computer. La pagina dice sempre
+in quale modo sta lavorando. Prova automatica di entrambi i modi: `tools/prova_web_e2e.py [--statico]`.
+
 ## 3. Il gioco (R-01 ... R-07)
 
 - Due giocatori, 10 minuti (anche 2 minuti o 20 secondi per prova). **A** guida la talpa con le frecce
@@ -73,7 +87,7 @@ musicali** attivi (per studiare, dopo, l'effetto della musica: ipotesi, non risu
 | `web/app/js/core.js` | regole del gioco (senza DOM, provate con Node) |
 | `web/app/js/dsp.mjs`, `classifier.mjs`, `pipeline.mjs`, `simulata.mjs`, `worker.mjs` | segnale |
 | `web/app/js/music.mjs` | musica di A (Web Audio) |
-| `web/app/js/main.mjs`, `view.mjs`, `api.mjs` | schermate, disegno, comunicazione col server |
+| `web/app/js/main.mjs`, `view.mjs`, `api.mjs`, `archivio_locale.mjs` | schermate, disegno, archivio (server o browser) |
 | `web/app/test/` | prove Node (`node --test web/app/test/*.test.*js`) |
 | `tools/prova_web_e2e.py` | partita lampo nel browser (richiede Playwright, facoltativo) |
 

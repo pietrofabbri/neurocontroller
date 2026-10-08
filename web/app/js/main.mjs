@@ -31,6 +31,11 @@ function riempiSelect(sel, codes, scelto) {
 }
 async function aggiornaHome() {
   try {
+    const modo = await api.rileva();
+    $('modo').hidden = modo === 'server';
+    $('modo').textContent = modo === 'server' ? '' : modo === 'browser'
+      ? 'Sito senza server: le partite si salvano solo in questo browser (su questo computer). Se cancelli i dati del sito si perdono: scarica ogni tanto il CSV.'
+      : 'Il browser non permette di salvare: le partite durano solo finché la pagina resta aperta.';
     S.players = (await api.giocatori()).map((p) => p.code);
     riempiSelect($('selA'), S.players, $('selA').value || S.players[0]);
     riempiSelect($('selB'), S.players, $('selB').value || S.players[1]);
@@ -46,7 +51,7 @@ async function aggiornaHome() {
     await aggiornaStorico();
     msgHome('');
   } catch (e) {
-    msgHome('Non riesco a parlare con il server locale (' + e.message + '). Avvialo con:  python3 -m neurocontroller serve  e apri http://localhost:8765/', 'err');
+    msgHome('Non riesco a leggere l\'archivio (' + e.message + ').', 'err');
   }
 }
 async function aggiornaStorico() {
@@ -66,6 +71,12 @@ async function nuovo(selId) {
 }
 $('newA').onclick = () => nuovo('selA');
 $('newB').onclick = () => nuovo('selB');
+$('csv').onclick = async (e) => {
+  if (api.modoAttuale() === 'server') return;           // il server fornisce il file da solo
+  e.preventDefault();
+  const url = URL.createObjectURL(new Blob([await api.csvTesto()], { type: 'text/csv' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'partite-talpa.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
 $('selA').onchange = () => aggiornaStorico().catch(() => {});
 $('del').onclick = async () => {
   const c = $('selDel').value; if (!c) return;
@@ -211,7 +222,7 @@ function finePartita() {
 }
 async function salva() {
   const m = $('f-salvataggio'); m.className = 'msg'; m.textContent = 'Salvo nel database…'; $('f-riprova').hidden = true;
-  try { const id = await api.salvaPartita(S.riga); m.className = 'msg ok'; m.textContent = 'Salvata nel database locale come partita #' + id + '.'; }
+  try { const id = await api.salvaPartita(S.riga); m.className = 'msg ok'; m.textContent = (api.modoAttuale() === 'server' ? 'Salvata nel database locale come partita #' : 'Salvata in questo browser come partita #') + id + '.'; }
   catch (e) { m.className = 'msg err'; m.textContent = 'Non sono riuscito a salvare: ' + e.message; $('f-riprova').hidden = false; }
 }
 $('f-riprova').onclick = salva;
