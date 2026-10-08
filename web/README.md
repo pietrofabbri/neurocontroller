@@ -1,8 +1,8 @@
-# web/ - versione web del neurocontroller (SOLO PROGETTAZIONE)
+# web/ - versione web del neurocontroller
 
-> **Stato (7 ottobre 2026): in questa cartella c'e' soltanto documentazione. Nessun codice.**
-> Decisione del docente referente: si comincia a **progettare e a fissare i vincoli**; il codice
-> verra' dopo, a tappe (`04-piano-e-accettazione.md`).
+> **Stato (9 ottobre 2026): tappa W0 implementata** - la **talpa** con B simulato, musica di A, database
+> locale (`05-talpa-w0.md`). Si avvia con `python3 -m neurocontroller serve`. Il sensore vero **non** e' ancora
+> collegato e la pulizia del segnale e' ancora solo progettata (`03`).
 
 ## Che cos'e'
 
@@ -38,6 +38,8 @@ nell'orientamento alle scuole medie) e puo' accogliere **altre cuffie** in futur
 | [`02-architettura.md`](02-architettura.md) | Moduli, flusso dei dati, cosa si eredita dal codice Python, piattaforma browser |
 | [`03-pulizia-del-segnale.md`](03-pulizia-del-segnale.md) | **La "bella pulizia"**: disturbi, rilevatori, protocollo di validazione, limiti |
 | [`04-piano-e-accettazione.md`](04-piano-e-accettazione.md) | Tappe W0-W4 con criteri di accettazione, rischi, decisioni aperte |
+| [`05-talpa-w0.md`](05-talpa-w0.md) | **Cio' che esiste**: come si avvia, regole della talpa, catena del segnale, database, cosa manca |
+| [`app/`](app/) | il codice (HTML, JavaScript, CSS: nessuna compilazione, V-14) |
 
 ## Come leggere questi documenti
 

@@ -80,3 +80,10 @@ mentale -> coerenza con una condizione -> punteggio, con A che aiuta via musica)
 - **Decisione del docente referente**: la versione web e' un **secondo binario**; il gioco GameMaker non viene toccato (se gli studenti vogliono proseguirlo e' libero); chi cura la documentazione abbandona l'ipotesi di sviluppare ulteriormente GameMaker. Per ora **solo documentazione** in `web/`, nessun codice.
 - **Richiesta aggiunta**: una "bella pulizia" del segnale (palpebre, mascella, rete, contatto), perche' il segnale vero e' molto piu' sporco di quello simulato e non e' mai stato provato con il sensore. Progettata in `web/03-pulizia-del-segnale.md` (rilevatori proposti, protocollo di validazione, criteri di accettazione, limiti); **non implementata**.
 - Nessun requisito `R-xx` cambia stato: la versione web e' tracciata verso i requisiti in `web/01-decisioni-e-vincoli.md`, sezione 3.
+
+## Aggiornamento 09/10/2026 - la talpa web (tappa W0)
+
+- **Decisione WD-4**: la versione web si realizza con la **talpa** (R-06) seguendo le richieste originali, con un database locale per i dati di gioco. Superata WD-2 ("solo documentazione").
+- **Implementato** (`web/05-talpa-w0.md`): server locale + SQLite (`python3 -m neurocontroller serve`), gioco a due con B **simulato**, musica di A, catena del segnale con **parita' verificata** con il Python (vettori di riferimento), classifica, storico, CSV, cancellazione di un giocatore. R-01, R-04, R-05, R-07, R-08 sono coperti **solo in simulazione**.
+- **Non fatto**: lettura del sensore (Web Serial), pulizia del segnale con rilevatori e protocollo di validazione, gamepad. Nessun EEG vero e' ancora passato dal sistema.
+- R-10 (risultati e statistiche) e' coperto solo **in locale**; "online" resta fuori (V-04).

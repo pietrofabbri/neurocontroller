@@ -56,7 +56,7 @@ progetto a coincidere con la scheda originale.
 - Nessun nome di studente nel repository: si usano i **ruoli** (hardware, audio,
   deployment, game design).
 
-## 5. Percorso parallelo: versione web (solo progettazione)
+## 5. Percorso parallelo: versione web (W0 implementata il 9/10/2026)
 
 La versione web (`web/`) e' un secondo binario, con tappe proprie **W0-W4** (`web/04-piano-e-accettazione.md`),
 vincoli `V-xx` e decisioni aperte `WD-x`. **Non sostituisce** le tappe M0-M6 e non modifica il progetto

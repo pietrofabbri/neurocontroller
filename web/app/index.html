@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neurocontroller · La talpa</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1>⛏️ La talpa <small>neurocontroller</small></h1>
+  <span id="badge-sim" class="badge sim" title="Il segnale di B non è EEG vero">SEGNALE SIMULATO</span>
+</header>
+
+<main>
+<!-- ============ HOME ============ -->
+<section id="home" class="screen">
+  <div class="cols">
+    <div class="card">
+      <h2>Nuova partita</h2>
+      <p class="muted">Due giocatori, un solo obiettivo: far scendere la talpa il più in profondità in 10 minuti.
+        <b>A</b> guida la talpa e sceglie la musica. <b>B</b> ascolta e prova a rilassarsi o a concentrarsi, secondo il terreno.</p>
+      <div class="row">
+        <label>Giocatore A <small>(guida + musica)</small>
+          <select id="selA"></select></label>
+        <button id="newA" class="small" type="button">+ nuovo</button>
+      </div>
+      <div class="row">
+        <label>Giocatore B <small>(la sua mente scava)</small>
+          <select id="selB"></select></label>
+        <button id="newB" class="small" type="button">+ nuovo</button>
+      </div>
+      <label>Chi dà il segnale di B?
+        <select id="sorgente">
+          <option value="tipica">Persona simulata · tipica (reagisce alla musica)</option>
+          <option value="debole">Persona simulata · poco reattiva</option>
+          <option value="nulla">Persona simulata · che non reagisce</option>
+          <option value="manuale">Tastiera: B gioca con Z (rilassa) e X (concentra)</option>
+          <option value="sensore" disabled>Sensore EEG (USB) · in arrivo con il controller</option>
+        </select></label>
+      <label>Durata
+        <select id="durata"><option value="20">Prova lampo · 20 secondi</option><option value="120">Prova · 2 minuti</option><option value="600" selected>Partita · 10 minuti</option></select></label>
+      <button id="avvia" class="primary" type="button">▶ Inizia</button>
+      <p id="home-msg" class="msg" role="status"></p>
+      <details class="note"><summary>Cosa significa tutto questo (leggere prima di usare il sensore)</summary>
+        <ul>
+          <li>Lo stato di B è una <b>stima</b> fatta da un sensore economico. È un esperimento per capire cosa possiamo e cosa non possiamo misurare. <b>Non è un dispositivo medico.</b></li>
+          <li>Finché la scritta <b>SEGNALE SIMULATO</b> è accesa, nessun cervello è misurato: un programma finge di essere B.</li>
+          <li>Con il sensore vero: per i minorenni serve il consenso di chi ne ha la responsabilità; si può smettere in qualsiasi momento; computer <b>a batteria</b>, scollegato dal caricatore; seguire le istruzioni del produttore; elettrodi solo su pelle integra.</li>
+          <li>Se il segnale è sporco (occhi chiusi forte, mascella, cavo mosso) la talpa <b>non</b> prende punti: stringere i denti non fa vincere.</li>
+          <li>Si usano solo codici (P01, P02…), mai nomi. I dati restano su questo computer.</li>
+        </ul></details>
+    </div>
+
+    <div class="card">
+      <h2>Classifica</h2>
+      <ol id="classifica" class="lista"></ol>
+      <h2>Ultime partite <small id="storico-chi"></small></h2>
+      <ul id="storico" class="lista"></ul>
+      <div class="row wrap">
+        <a id="csv" class="btnlink" href="/api/export.csv" download="partite-talpa.csv">⬇ Scarica tutte le partite (CSV)</a>
+      </div>
+      <details class="note"><summary>Gestione dei giocatori</summary>
+        <div class="row"><select id="selDel"></select><button id="del" class="small danger" type="button">Cancella giocatore e le sue partite</button></div>
+        <p class="muted">La cancellazione toglie dal database anche le partite in cui compare.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PARTITA ============ -->
+<section id="gioco" class="screen" hidden>
+  <div class="gamegrid">
+    <div class="stage">
+      <canvas id="mondo" width="720" height="560" aria-label="La talpa e il terreno"></canvas>
+      <div id="overlay" class="overlay" hidden></div>
+    </div>
+    <aside class="panel">
+      <div class="hud">
+        <div><span class="k">Tempo</span><b id="h-tempo">10:00</b></div>
+        <div><span class="k">Profondità</span><b id="h-prof">0.0 m</b></div>
+        <div><span class="k">Punti</span><b id="h-punti">0</b></div>
+      </div>
+      <div class="box">
+        <div class="k">Terreno ora</div><b id="h-terreno">—</b>
+        <div class="k">B deve essere</div><b id="h-richiesto">—</b>
+        <div class="k" id="h-prossimo"></div>
+      </div>
+      <div class="box">
+        <div class="k">Stato di B (stima)</div><b id="h-stato">—</b>
+        <div class="meter"><i id="m-score"></i><u></u></div>
+        <div class="k">rilassato ◂ ▸ concentrato</div>
+        <div class="k">Segnale: <b id="h-qualita">—</b></div>
+        <div class="k">Coerenza: <b id="h-coerenza">0%</b></div>
+        <div class="bar"><i id="m-coer"></i></div>
+      </div>
+      <div class="box">
+        <div class="k">🎵 Musica per B (solo tu, A)</div>
+        <label>Ritmo <span id="v-tempo"></span><input id="r-tempo" type="range" min="60" max="140" step="1"></label>
+        <label>Suono chiaro <span id="v-luminosita"></span><input id="r-luminosita" type="range" min="0" max="1" step="0.01"></label>
+        <label>Quante note <span id="v-densita"></span><input id="r-densita" type="range" min="0" max="1" step="0.01"></label>
+        <label>Acuto <span id="v-registro"></span><input id="r-registro" type="range" min="0" max="1" step="0.01"></label>
+        <div class="row wrap">
+          <button class="small" data-preset="calmo" type="button">1 · calma</button>
+          <button class="small" data-preset="neutro" type="button">2 · medio</button>
+          <button class="small" data-preset="energico" type="button">3 · carica</button>
+        </div>
+        <label class="inline"><input id="vol" type="range" min="0" max="1" step="0.05" value="0.5"> volume</label>
+      </div>
+      <details class="box" id="cofano"><summary>Sotto il cofano</summary>
+        <canvas id="scope" width="240" height="110"></canvas>
+        <div class="k">E = <span id="c-E">—</span> · rumore <span id="c-rms">—</span> · muscoli <span id="c-hf">—</span></div>
+      </details>
+      <p class="keys">
+        <b>A</b>: ← → guida · ↓ / spazio scavo veloce (più rischio)<br>
+        Musica: Q/A ritmo · W/S chiaro · E/D note · R/F acuto · 1 2 3 preset<br>
+        <span id="keys-b">B simulato: Z rilassa · X concentra · J mascella (prova)</span><br>
+        Esc: interrompi
+      </p>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ FINE ============ -->
+<section id="fine" class="screen" hidden>
+  <div class="card wide">
+    <h2 id="f-titolo">Partita finita</h2>
+    <div class="hud big">
+      <div><span class="k">Profondità</span><b id="f-prof">—</b></div>
+      <div><span class="k">Punti</span><b id="f-punti">—</b></div>
+      <div><span class="k">Coerenza media</span><b id="f-coer">—</b></div>
+      <div><span class="k">Rocce urtate</span><b id="f-urti">—</b></div>
+    </div>
+    <canvas id="riepilogo" width="720" height="180"></canvas>
+    <p id="f-dettagli" class="muted"></p>
+    <p id="f-salvataggio" class="msg" role="status"></p>
+    <div class="row wrap">
+      <button id="f-ancora" class="primary" type="button">↺ Un'altra partita</button>
+      <button id="f-riprova" type="button" hidden>Riprova a salvare</button>
+      <button id="f-home" type="button">Torna all'inizio</button>
+    </div>
+  </div>
+</section>
+</main>
+<script src="js/core.js"></script>
+<script type="module" src="js/main.mjs"></script>
+</body>
+</html>

@@ -5,8 +5,9 @@
 | ID | Decisione | Conseguenza |
 |----|-----------|-------------|
 | **WD-1** | La versione web e' un **secondo binario**. Il gioco GameMaker resta com'e'; se gli studenti vogliono proseguirlo, e' libero ed e' supportato dalla documentazione esistente. Chi cura questa documentazione **abbandona l'ipotesi** di sviluppare ulteriormente GameMaker. | Nessuna modifica a `game/BLeppo2/`. Il protocollo UDP e il pacchetto `neurocontroller/` restano il ponte verso GameMaker. |
-| **WD-2** | Per ora **solo documentazione** nella cartella `web/`. | Nessun codice finche' le tappe di `04-piano-e-accettazione.md` non vengono avviate. |
+| **WD-2** | Per ora **solo documentazione** nella cartella `web/`. | **Superata il 9 ottobre 2026 da WD-4**: le tappe sono state avviate. |
 | **WD-3** | La **pulizia del segnale** (disturbi di palpebre, mascella, rete, contatto) e' un requisito di prima classe, non un'aggiunta finale. | Documento `03-pulizia-del-segnale.md`; la tappa W1 non si chiude senza la validazione descritta li'. |
+| **WD-4** | (9 ottobre 2026) Si realizza la web app **con la talpa**, seguendo le richieste originali, con **database** che salva i dati di gioco di ognuno; il controller vero arriva dopo. | Piccolo **server locale** + SQLite sul computer; V-04 vale ancora (nessun dato esce); dettagli in `05-talpa-w0.md`. |
 
 ## 2. Vincoli (V-xx)
 
@@ -25,8 +26,9 @@ I vincoli valgono per **qualunque** implementazione della versione web, anche sc
 
 ### 2.2 Dati, privacy, sicurezza
 
-- **V-04 - Tutto in locale.** Nessun segnale EEG, profilo o risultato lascia il browser: **nessun
-  server, nessuna statistica inviata, nessun servizio esterno di analisi**. L'elaborazione avviene
+- **V-04 - Tutto in locale.** Nessun segnale EEG, profilo o risultato lascia il computer: **nessuna
+  statistica inviata, nessun servizio esterno di analisi**. (Precisazione WD-4: e' ammesso un server
+  **locale** su `127.0.0.1` con un database SQLite sullo stesso computer.) L'elaborazione avviene
   nel browser. (R-10, "risultati online", e' un'estensione futura, vedi `04`, tappa W4, e richiede
   una decisione esplicita sulla protezione dei dati.)
 - **V-05 - Nessun dato fisiologico versionato o salvato di nascosto.** Il segnale grezzo e i profili

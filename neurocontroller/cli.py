@@ -302,6 +302,32 @@ def cmd_demo(args: argparse.Namespace, out: Callable[[str], None]) -> int:
         return cmd_live(args, out)
 
 
+def cmd_serve(args: argparse.Namespace, out: Callable[[str], None]) -> int:
+    from pathlib import Path as _P
+    from .server import make_server
+    root = _P(__file__).resolve().parent.parent
+    static = _P(args.static_dir) if args.static_dir else root / "web" / "app"
+    if not (static / "index.html").is_file():
+        raise CliError("non trovo la web app in %s (manca index.html)" % static)
+    db = _data_dir(args) / "web" / "giochi.sqlite3"
+    try:
+        server, _ = make_server(db, static, host=args.host, port=args.port)
+    except OSError as exc:
+        raise CliError("non riesco ad ascoltare su %s:%d (%s). Prova un'altra porta con --port."
+                       % (args.host, args.port, exc))
+    shown = "localhost" if args.host in ("127.0.0.1", "0.0.0.0", "::1") else args.host
+    out("Web app pronta: apri in Chrome o Edge  http://%s:%d/" % (shown, args.port))
+    out("Database: %s   (resta su questo computer; non va versionato)" % db)
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        out("ATTENZIONE: in ascolto su %s: i dati sono raggiungibili dalla rete." % args.host)
+    out("Per fermare: Ctrl+C")
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+    return 0
+
+
 def cmd_profiles(args: argparse.Namespace, out: Callable[[str], None]) -> int:
     pdir = _data_dir(args) / "profiles"
     files = sorted(pdir.glob("P*.json")) if pdir.is_dir() else []
@@ -380,6 +406,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("profiles", help="elenca i profili salvati")
     p.add_argument("--data-dir")
+
+    p = sub.add_parser("serve", help="avvia la web app (talpa) con il database locale")
+    p.add_argument("--data-dir")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--host", default="127.0.0.1",
+                   help="indirizzo di ascolto (default: solo questo computer)")
+    p.add_argument("--static-dir", help="cartella della web app (default: web/app)")
     return parser
 
 
@@ -397,6 +430,8 @@ def main(argv: Optional[Sequence[str]] = None, out: Callable[[str], None] = prin
             return cmd_live(args, out)
         if args.command == "demo":
             return cmd_demo(args, out)
+        if args.command == "serve":
+            return cmd_serve(args, out)
         return cmd_profiles(args, out)
     except CliError as exc:
         out("ERRORE: %s" % exc)
