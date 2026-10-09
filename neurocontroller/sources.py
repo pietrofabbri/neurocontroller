@@ -414,6 +414,61 @@ class ChordsSerialSource(Source):
             close()
 
 
+def detect_serial_format(port: str, bauds: Sequence[int] = (9600, 115200), opener: Optional[Callable[[str, int], object]] = None,
+                         settle: float = 2.2, observe: float = 1.8) -> Tuple[int, str, str]:
+    """Riconosce da solo baud e formato del sensore. Restituisce (baud, formato, descrizione dei tentativi).
+
+    Formato: "chords" (pacchetti binari C7 7C ... 01 dopo START) o "ascii" (una riga di testo per campione).
+    Solleva ValueError con la diagnosi se nessun tentativo riconosce un formato. Serve perche' sul sensore
+    del docente (9/10/2026) lo sketch caricato mandava testo a 9600 baud, mentre provaBCI manda binario a 115200.
+    """
+    if opener is None:
+        try:
+            import serial  # type: ignore  # pyserial
+        except ImportError:
+            raise RuntimeError("manca la libreria pyserial: installarla con  pip install pyserial") from None
+
+        def opener(p: str, b: int) -> object:  # noqa: E306
+            return serial.Serial(p, b, timeout=0.2)
+    log: List[str] = []
+    for baud in bauds:
+        ser = opener(port, baud)
+        try:
+            time.sleep(settle)  # l'Arduino si riavvia all'apertura della porta
+            flush = getattr(ser, "reset_input_buffer", None)
+            if flush:
+                flush()
+            ser.write(b"WHORU\n")  # type: ignore[attr-defined]
+            ser.write(b"START\n")  # type: ignore[attr-defined]
+            deadline = time.time() + observe
+            data = b""
+            while time.time() < deadline:
+                chunk = ser.read(256)  # type: ignore[attr-defined]
+                if chunk:
+                    data += chunk
+                elif not hasattr(ser, "in_waiting"):
+                    break  # finto senza altri dati
+            try:
+                ser.write(b"STOP\n")  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        finally:
+            close = getattr(ser, "close", None)
+            if close:
+                close()
+        parser = ChordsParser(6)
+        packets = len(parser.push(data))
+        lines = [l for l in data.split(b"\n")[1:-1]]
+        good = sum(1 for l in lines if parse_line(l) is not None)
+        log.append("%d baud: %d byte, %d pacchetti, %d righe numeriche" % (baud, len(data), packets, good))
+        if packets >= 3:
+            return baud, "chords", "; ".join(log)
+        if good >= 10 and good >= 4 * (len(lines) - good):
+            return baud, "ascii", "; ".join(log)
+    raise ValueError("formato dei dati non riconosciuto (%s). Attesi: righe di testo con un numero a 9600 baud, "
+                     "oppure pacchetti C7 7C ... 01 a 115200. Chiudere il monitor seriale dell'Arduino IDE." % "; ".join(log))
+
+
 def list_serial_ports() -> List[Tuple[str, str]]:
     """Porte seriali presenti, come (dispositivo, descrizione). Vuoto se pyserial manca.
 

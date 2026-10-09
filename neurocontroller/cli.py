@@ -25,7 +25,7 @@ from .live import LiveError, LiveRunner, LiveUpdate
 from .profile import (Profile, ProfileError, StateClassifier, check_participant_id,
                       next_participant_id)
 from .protocol import default_protocol, scaled
-from .sources import (DEFAULT_FS, PERSONAS, ChordsSerialSource, CsvReplaySource, SerialSource, SimulatedSource, Source,
+from .sources import (DEFAULT_FS, PERSONAS, ChordsSerialSource, CsvReplaySource, detect_serial_format, SerialSource, SimulatedSource, Source,
                       list_serial_ports, pick_port)
 
 DEFAULT_SCRIPT = "relax:12,focus:12,jaw:3,relax:8,focus:8"
@@ -45,12 +45,13 @@ def _add_source_args(p: argparse.ArgumentParser) -> None:
                    help="da dove arrivano i dati (default: serial = sensore vero)")
     g.add_argument("--serial-port", default=os.environ.get("NEUROCONTROLLER_PORT"),
                    help="porta seriale, es. COM3 o /dev/ttyACM0 (oppure variabile NEUROCONTROLLER_PORT)")
-    g.add_argument("--baud", type=int, default=115200)
+    g.add_argument("--baud", type=int, default=None,
+                   help="baud della porta (default: lo si riconosce da soli provando 9600 e 115200)")
     g.add_argument("--fs", type=float, default=DEFAULT_FS,
                    help="campioni al secondo del sensore (da verificare con 'check'; default %(default)s)")
-    g.add_argument("--format", dest="serial_format", choices=("chords", "ascii"), default="chords",
-                   help="formato dei dati seriali: chords = pacchetti binari del firmware provaBCI (default), "
-                        "ascii = una riga di testo per campione")
+    g.add_argument("--format", dest="serial_format", choices=("auto", "chords", "ascii"), default="auto",
+                   help="formato dei dati seriali: auto = lo si riconosce da soli (default), "
+                        "chords = pacchetti binari del firmware provaBCI, ascii = una riga di testo per campione")
     g.add_argument("--channel", type=int, default=0, help="canale dell'Arduino con il sensore, 0 = A0 (formato chords)")
     g.add_argument("--column", type=int, default=0, help="colonna del campione nelle righe di testo (formato ascii)")
     g.add_argument("--adc-max", type=float, default=1023.0,
@@ -88,10 +89,19 @@ def _build_source(args: argparse.Namespace, script: Optional[Sequence[Tuple[str,
                            "pip install pyserial), oppure usare --source simulated per provare senza "
                            "sensore. 'python3 -m neurocontroller ports' mostra le porte.")
     try:
-        if args.serial_format == "chords":
-            return ChordsSerialSource(port, baud=args.baud, fs=args.fs, channel=args.channel,
+        baud, fmt = args.baud, args.serial_format
+        if fmt == "auto" or baud is None:
+            try:
+                det_baud, det_fmt, tentativi = detect_serial_format(
+                    port, bauds=(baud,) if baud else (9600, 115200))
+            except ValueError as exc:
+                raise CliError(str(exc)) from None
+            baud, fmt = det_baud, (det_fmt if fmt == "auto" else fmt)
+            print("Sensore riconosciuto: formato %s a %d baud (%s)" % (fmt, baud, tentativi))
+        if fmt == "chords":
+            return ChordsSerialSource(port, baud=baud, fs=args.fs, channel=args.channel,
                                       adc_max=args.adc_max)
-        return SerialSource(port, baud=args.baud, fs=args.fs, column=args.column,
+        return SerialSource(port, baud=baud, fs=args.fs, column=args.column if args.channel == 0 else args.channel,
                             adc_max=args.adc_max)
     except RuntimeError as exc:
         raise CliError(str(exc)) from None

@@ -53,10 +53,11 @@ export class FlussoSensore {
     try {
       this.worker = new Worker(new URL('./worker.mjs', import.meta.url), { type: 'module' });
       this.worker.onmessage = (e) => this.daWorker(e.data);
-      this.src = new SerialSource({ protocol: 'chords', channel: +this.$('s-canale').value, onData: (a, t, all) => this.dati(a, t, all), onError: (e) => this.msg('Errore della porta: ' + e.message, 'err'),
+      this.src = new SerialSource({ protocol: 'auto', channel: +this.$('s-canale').value, onData: (a, t, all) => this.dati(a, t, all), onError: (e) => this.msg('Errore della porta: ' + e.message, 'err'),
         onClose: () => { if (this.fase !== 'chiuso') this.msg('La porta seriale si è chiusa (cavo scollegato?).', 'err'); } });
       await this.src.connect();
     } catch (e) { this.msg(e.name === 'NotFoundError' ? 'Nessuna porta scelta.' : 'Non riesco ad aprire la porta: ' + e.message, 'err'); return; }
+    this.$('s-conn').textContent = 'Formato rilevato: ' + this.src.protocol + ' a ' + this.src.baud + ' baud';
     this.fase = 'check'; this.checkBuf = []; this.rate = new RateMeter(); this.raw = []; this.tCheck = performance.now();
     this.$('s-collega').disabled = true; this.$('s-check').hidden = false;
     this.$('s-check').innerHTML = 'Controllo del segnale: stai <b>fermo/a, occhi aperti, a riposo</b> per ' + CHECK_S + ' secondi…';
@@ -70,14 +71,14 @@ export class FlussoSensore {
     }
     else if (this.worker && (this.fase === 'calib' || this.fase === 'gioco' || this.fase === 'live')) this.worker.postMessage({ type: 'campioni', data: arr });
     const st = this.src.stats;
-    this.$('s-conn').textContent = 'Pacchetti: ' + st.packets + ' · persi: ' + st.lost + (st.board ? ' · scheda ' + st.board : '');
+    this.$('s-conn').textContent = (st.protocol === 'chords' ? 'Pacchetti: ' + st.packets + ' · persi: ' + st.lost : 'Righe valide: ' + this.src.good + ' · scartate: ' + this.src.bad) + (st.board ? ' · scheda ' + st.board : '');
   }
   tickCheck() {
     const el = this.$('s-check');
     if (this.src.good === 0 && performance.now() - this.tCheck > 3000) {
       const st = this.src.stats, t = st.text.replace(/</g, '&lt;').slice(0, 120);
-      el.innerHTML = '<span class="sem bad">nessun dato</span> Arrivano ' + st.bytes + ' byte, ' + st.packets + ' pacchetti validi' + (t ? '; testo ricevuto: «' + t + '»' : '') +
-        '. ' + (st.bytes === 0 ? 'Non arriva nulla: porta sbagliata, porta occupata (chiudi il monitor seriale dell\'Arduino IDE) o cavo.' : 'Arrivano byte ma non pacchetti nel formato atteso (C7 7C … 01, 115200 baud): controlla il firmware.');
+      el.innerHTML = '<span class="sem bad">nessun dato</span> Tentativi: ' + (st.tried.join(' · ') || '—') + (t ? '; testo ricevuto: «' + t + '»' : '') +
+        '. ' + (st.bytes === 0 ? 'Non arriva nulla: porta sbagliata, porta occupata (chiudi il monitor seriale dell\'Arduino IDE) o cavo.' : 'Arrivano byte ma non in un formato riconosciuto (righe di testo con un numero, a 9600 baud; oppure pacchetti C7 7C … 01 a 115200): controlla il firmware caricato.');
       return;
     }
     if (performance.now() - this.tCheck < CHECK_S * 1000) return;
@@ -90,10 +91,11 @@ export class FlussoSensore {
     const probs = q.problems.slice();
     if (!fsM || fsM < 60) probs.push('frequenza di campionamento misurata troppo bassa (' + Math.round(fsM) + ' campioni/s)');
     else if (dev > 0.10) probs.push('frequenza misurata ' + Math.round(fsM) + ' campioni/s, diversa dai 250 attesi: la uso così com\'è, ma verifica il firmware');
+    if (this.src.stats.protocol === 'ascii' && this.src.baud <= 19200) probs.push('a ' + this.src.baud + ' baud la porta limita la velocità e i campioni non sono a intervalli regolari: meglio caricare sull\'Arduino lo sketch provaBCI.ino (115200 baud, 250 campioni/s)');
     const grave = !q.ok || !fsM || fsM < 60;
     this.fs = fsM >= 60 ? fsM : 250;
     el.innerHTML = '<span class="sem ' + (grave ? 'bad' : probs.length ? 'warn' : 'ok') + '">' + (grave ? 'da sistemare' : probs.length ? 'attenzione' : 'segnale ok') + '</span> ' +
-      'pacchetti persi <b>' + this.src.stats.lost + '</b> su ' + this.src.stats.packets + ' · ' + this.canali() + '<br>' +
+      (this.src.stats.protocol === 'chords' ? 'pacchetti persi <b>' + this.src.stats.lost + '</b> su ' + this.src.stats.packets + ' · ' + this.canali() : 'formato testo, un valore per riga a ' + this.src.baud + ' baud') + '<br>' +
       'frequenza misurata <b>' + Math.round(fsM) + '</b> campioni/s · variazione (dev. standard) <b>' + q.std.toFixed(1) + '</b> · sul fondo scala ' + Math.round(100 * q.clipFraction) + '% · rete 50 Hz ' + q.mainsRatio.toFixed(2) +
       (probs.length ? '<ul>' + probs.map((p) => '<li>' + p + '</li>').join('') + '</ul>' : '') +
       '<div class="muted">Controllo grossolano: dice se ha senso procedere, non che sia EEG.</div>';

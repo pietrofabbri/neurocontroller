@@ -131,3 +131,8 @@ musicali** attivi (per studiare, dopo, l'effetto della musica: ipotesi, non risu
 3. **Controller di A (gamepad)** e, se serve, i "due gruppi di comandi" di R-03 (`WD-G`).
 4. Gemme/bonus (il campo `gems` esiste ma vale 0), audio di eventi (urto, cambio terreno).
 5. Giudizio di sessione (`03`, sez. 3, L3): sospendere i punti se il segnale pulito scende sotto il 60%.
+
+
+## Sensore: riconoscimento automatico del formato (09/10 sera)
+
+La scheda di Pietro invia righe ASCII a 9600 baud (misurati ~193 campioni/s, media 537, dev. standard 24.8), non i pacchetti Chords a 115200. La pagina e `serve` provano 9600 e 115200 e riconoscono da sole formato e baud (pacchetti C7 7C o righe di testo). Con 9600 baud la frequenza non e 250 Hz: la pagina lo segnala e usa quella misurata. Per i 250 Hz esatti: caricare provaBCI.ino (115200). Il Python ora legge sia ASCII sia Chords (`--format auto`).

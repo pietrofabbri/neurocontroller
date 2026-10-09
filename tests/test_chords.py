@@ -100,3 +100,47 @@ class SourceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DetectTests(unittest.TestCase):
+    """Riconoscimento automatico di baud e formato (sensore con sketch a testo 9600 o provaBCI 115200)."""
+
+    class Fake:
+        def __init__(self, chunks):
+            self.chunks = list(chunks)
+            self.written = []
+
+        def write(self, d):
+            self.written.append(d)
+
+        def read(self, n=1):
+            return self.chunks.pop(0) if self.chunks else b""
+
+        def close(self):
+            pass
+
+    def test_ascii_at_9600(self):
+        from neurocontroller.sources import detect_serial_format
+        text = b"".join(b"%d\r\n" % (500 + i) for i in range(60))
+        opened = []
+
+        def opener(port, baud):
+            opened.append(baud)
+            return self.Fake([text] if baud == 9600 else [b"\x00" * 200])
+        baud, fmt, log = detect_serial_format("X", opener=opener, settle=0, observe=0.05)
+        self.assertEqual((baud, fmt, opened), (9600, "ascii", [9600]))
+
+    def test_chords_at_115200_after_9600_zeros(self):
+        from neurocontroller.sources import detect_serial_format
+        data = b"".join(pkt(i, [100] * 6) for i in range(20))
+
+        def opener(port, baud):
+            return self.Fake([data] if baud == 115200 else [b"\x00" * 200])
+        baud, fmt, _ = detect_serial_format("X", opener=opener, settle=0, observe=0.05)
+        self.assertEqual((baud, fmt), (115200, "chords"))
+
+    def test_nothing_recognised(self):
+        from neurocontroller.sources import detect_serial_format
+        with self.assertRaises(ValueError) as ctx:
+            detect_serial_format("X", opener=lambda p, b: self.Fake([b"\x00" * 500]), settle=0, observe=0.05)
+        self.assertIn("non riconosciuto", str(ctx.exception))

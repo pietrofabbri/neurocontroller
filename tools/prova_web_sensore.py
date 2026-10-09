@@ -3,7 +3,7 @@
 La porta finta parla il protocollo del firmware (WHORU/START, pacchetti binari C7 7C ... 01) a 250 campioni/s con un segnale sintetico il cui stato (rilassato /
 concentrato) e' deciso dallo script. Verifica collegamento, controllo, calibrazione, partita e salvataggio
 con sorgente 'sensore'. NON prova nulla sul sensore vero. Richiede Playwright con Chromium (facoltativo).
-Uso: python3 tools/prova_web_sensore.py [cartella-screenshot]
+Uso: python3 tools/prova_web_sensore.py [cartella-screenshot] [--ascii]\n--ascii: simula lo sketch a righe di testo a 9600 baud (a 115200 la porta restituisce solo zeri), come il sensore\ndel docente il 9/10/2026; la pagina deve riconoscere da sola formato e baud.
 """
 import os
 import subprocess
@@ -17,7 +17,7 @@ PORT = "8798"
 
 MOCK = r"""
 (() => {
-  const fs = 250; let n = 0, t0 = null; window.__mockMind = 0.5; window.__mockJaw = 0;
+  const ASCII = %ASCII%; let baud = 0; const fs = ASCII ? 193 : 250; let n = 0, t0 = null; window.__mockMind = 0.5; window.__mockJaw = 0;
   let seed = 12345; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   const gauss = () => Math.sqrt(-2 * Math.log(Math.max(rnd(), 1e-12))) * Math.cos(2 * Math.PI * rnd());
   const ph = Array.from({ length: 16 }, () => rnd() * 6.283);
@@ -38,7 +38,7 @@ MOCK = r"""
     p[15] = 1; return p;
   }
   const port = {
-    async open() {}, async close() {},
+    async open(o) { baud = o.baudRate; }, async close() {},
     writable: { getWriter() { return {
       async write(bytes) {
         const t = new TextDecoder().decode(bytes).trim().toUpperCase();
@@ -48,6 +48,14 @@ MOCK = r"""
       }, releaseLock() {} }; } },
     readable: { getReader() { let closed = false; return {
       async read() {
+        if (ASCII) {
+          if (baud !== 9600) { await new Promise((r) => setTimeout(r, 20)); return { value: new Uint8Array(100), done: closed }; }   // zeri
+          if (t0 === null) t0 = performance.now();
+          const due = t0 + (n + 8) / fs * 1000, wait = due - performance.now();
+          if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+          let txt = ''; for (let i = 0; i < 8; i++) txt += sample() + '\r\n';
+          return { value: enc(txt), done: closed };
+        }
         if (outq.length) return { value: outq.shift(), done: false };
         if (!started) { await new Promise((r) => setTimeout(r, 30)); return { value: new Uint8Array(0), done: closed }; }
         if (t0 === null) t0 = performance.now();
@@ -66,7 +74,9 @@ MOCK = r"""
 
 def main() -> int:
     from playwright.sync_api import sync_playwright
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    ascii_mode = "--ascii" in sys.argv
+    out = Path(args[0]) if args else None
     exe = os.environ.get("CHROMIUM", "/opt/pw-browsers/chromium")
     errs, ok = [], False
     with tempfile.TemporaryDirectory() as tmp:
@@ -78,7 +88,7 @@ def main() -> int:
                 b = p.chromium.launch(executable_path=exe if Path(exe).exists() else None,
                                       args=["--autoplay-policy=no-user-gesture-required"])
                 pg = b.new_page(viewport={"width": 1280, "height": 900})
-                pg.add_init_script(MOCK)
+                pg.add_init_script(MOCK.replace("%ASCII%", "true" if ascii_mode else "false"))
                 pg.on("console", lambda m: errs.append(m.text) if m.type in ("error", "warning") else None)
                 pg.on("pageerror", lambda e: errs.append("PAGEERROR " + str(e)))
                 pg.goto("http://localhost:%s/?calib=14" % PORT)
@@ -90,7 +100,10 @@ def main() -> int:
                 pg.check("#s-ok")
                 pg.click("#s-collega")
                 pg.wait_for_selector("#s-calibra:not([hidden])", timeout=20000)
-                print("controllo:", pg.inner_text("#s-check")[:160].replace("\n", " "))
+                print("controllo:", pg.inner_text("#s-check")[:260].replace("\n", " "))
+                if ascii_mode and "formato testo" not in pg.inner_text("#s-check"):
+                    print("ERRORE: formato testo non riconosciuto")
+                    return 1
                 pg.click("#s-calibra")
                 for _ in range(4):                      # quattro blocchi: l'istruzione dice se rilassarsi o calcolare
                     pg.wait_for_function("document.getElementById('s-tempo').textContent.startsWith('Preparati')", timeout=30000)
