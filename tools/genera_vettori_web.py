@@ -99,7 +99,18 @@ def righe_e_qualita():
         q = dsp.signal_quality(x, fs)
         qualita.append({"nome": nome, "fs": fs, "x": x, "ok": q["ok"], "std": q["std"], "clip": q["clip_fraction"],
                         "mains": q["mains_ratio"], "problemi": len(q["problems"])})
-    return {"righe": righe, "qualita": qualita}
+    from neurocontroller.sources import ChordsParser
+
+    def pk(c, vals):
+        return bytes([0xC7, 0x7C, c & 255]) + b"".join(bytes([v >> 8, v & 255]) for v in vals) + b"\x01"
+    bad = bytearray(pk(9, [5] * 6))
+    bad[15] = 7
+    flusso = (b"UNO-CLONE\r\n" + pk(250, [10, 20, 30, 40, 50, 60]) + pk(252, [1, 2, 3, 4, 5, 1023]) + b"\xc7\x00" + bytes(bad)
+              + pk(253, [0, 0, 0, 0, 0, 0]) + pk(0, [512, 511, 510, 509, 508, 507]))
+    pr = ChordsParser(6)
+    pacchetti = pr.push(flusso)
+    chords = {"hex": flusso.hex(), "pacchetti": [[c, v] for c, v in pacchetti], "persi": pr.lost, "scartati": pr.skipped}
+    return {"righe": righe, "qualita": qualita, "chords": chords}
 
 
 if __name__ == "__main__":

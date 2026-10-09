@@ -14,6 +14,7 @@ from __future__ import annotations
 import math
 import random
 import re
+import time
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -269,6 +270,145 @@ class SerialSource(Source):
             reset()
 
     def close(self) -> None:
+        close = getattr(self._ser, "close", None)
+        if close:
+            close()
+
+
+# --------------------------------------------------------------------------------------
+# Firmware "Chords" (provaBCI.ino): pacchetti binari
+# --------------------------------------------------------------------------------------
+
+CHORDS_SYNC1, CHORDS_SYNC2, CHORDS_END = 0xC7, 0x7C, 0x01
+CHORDS_BOARDS = {"UNO-R3": 6, "GENUINO-UNO": 6, "UNO-CLONE": 6, "NANO-CLASSIC": 8, "NANO-CLONE": 8,
+                 "MEGA-2560-R3": 16, "MEGA-2560-CLONE": 16}
+
+
+def chords_packet_length(channels: int) -> int:
+    return channels * 2 + 4
+
+
+class ChordsParser:
+    """Decodifica il flusso binario del firmware provaBCI (Upside Down Labs "Chords").
+
+    Pacchetto: 0xC7 0x7C, contatore, N canali x (byte alto, byte basso) a 10 bit, 0x01 finale.
+    Il formato e' ricavato dal codice del firmware (provaBCI.ino), NON da dati registrati.
+    Si risincronizza se arrivano byte estranei; conta i pacchetti persi dal contatore.
+    """
+
+    def __init__(self, channels: int = 6):
+        self.channels = channels
+        self.rest = b""
+        self.packets = 0
+        self.lost = 0
+        self.skipped = 0
+        self.prev: Optional[int] = None
+        self.text = ""
+
+    def push(self, data: bytes) -> List[Tuple[int, List[int]]]:
+        n = chords_packet_length(self.channels)
+        buf = self.rest + bytes(data)
+        out: List[Tuple[int, List[int]]] = []
+        i = 0
+        while i < len(buf):
+            if buf[i] == CHORDS_SYNC1 and (i + 1 >= len(buf) or buf[i + 1] == CHORDS_SYNC2):
+                if i + n > len(buf):
+                    break  # pacchetto non ancora completo
+                if buf[i + n - 1] == CHORDS_END:
+                    counter = buf[i + 2]
+                    values = [(buf[i + 3 + 2 * c] << 8) | buf[i + 4 + 2 * c] for c in range(self.channels)]
+                    if self.prev is not None:
+                        self.lost += (counter - self.prev - 1) & 255
+                    self.prev = counter
+                    self.packets += 1
+                    out.append((counter, values))
+                    i += n
+                    continue
+            b = buf[i]
+            if 32 <= b < 127 and len(self.text) < 400:
+                self.text += chr(b)
+            elif b == 10 and len(self.text) < 400:
+                self.text += "\n"
+            self.skipped += 1
+            i += 1
+        self.rest = buf[i:]
+        return out
+
+
+class ChordsSerialSource(Source):
+    """Legge il sensore con il firmware provaBCI: invia WHORU e START, decodifica i pacchetti binari."""
+
+    realtime = True
+    simulated = False
+
+    def __init__(self, port: str, baud: int = 115200, fs: float = DEFAULT_FS, channel: int = 0,
+                 channels: int = 6, timeout: float = 2.0, opener: Optional[Callable[[], object]] = None,
+                 adc_max: float = 1023.0, settle: float = 2.2):
+        self.fs = float(fs)
+        self.adc_max = float(adc_max)
+        self.channel = channel
+        self.board: Optional[str] = None
+        self.parser = ChordsParser(channels)
+        self._queue: List[float] = []
+        self.description = "seriale %s @ %d baud, pacchetti Chords (canale A%d, assunti %.0f campioni/s)" % (
+            port, baud, channel, fs)
+        if opener is None:
+            try:
+                import serial  # type: ignore  # pyserial
+            except ImportError:
+                raise RuntimeError("manca la libreria pyserial: installarla con  pip install pyserial") from None
+
+            def opener() -> object:  # noqa: E306
+                return serial.Serial(port, baud, timeout=timeout)
+        self._ser = opener()
+        time.sleep(settle)  # l'Arduino si riavvia all'apertura della porta
+        self._write(b"WHORU\n")
+        time.sleep(min(0.7, settle))
+        reply = self._ser.read(256) or b""
+        self.parser.push(reply)
+        for name, ch in CHORDS_BOARDS.items():
+            if name.encode() in reply.upper():
+                self.board, self.parser.channels = name, ch
+                break
+        if channel >= self.parser.channels:
+            raise ValueError("canale A%d non esiste: la scheda ha %d canali" % (channel, self.parser.channels))
+        self._write(b"START\n")
+
+    def _write(self, data: bytes) -> None:
+        write = getattr(self._ser, "write", None)
+        if write:
+            write(data)
+
+    def read(self, n: int) -> List[float]:
+        out: List[float] = []
+        while len(out) < n:
+            if not self._queue:
+                data = self._ser.read(64)
+                if not data:
+                    raise TimeoutError("nessun dato dalla porta seriale: sensore spento, cavo scollegato, "
+                                       "porta occupata (chiudere il monitor seriale dell'Arduino IDE) "
+                                       "o firmware diverso da provaBCI")
+                for _, values in self.parser.push(data):
+                    self._queue.append(float(values[self.channel]))
+                if self.parser.skipped > 2000 and self.parser.packets == 0:
+                    raise ValueError("formato dei dati non riconosciuto: attesi pacchetti C7 7C ... 01 "
+                                     "(testo ricevuto: %r)" % self.parser.text[:40])
+            take = min(n - len(out), len(self._queue))
+            out.extend(self._queue[:take])
+            del self._queue[:take]
+        return out
+
+    def flush(self) -> None:
+        reset = getattr(self._ser, "reset_input_buffer", None)
+        if reset:
+            reset()
+        self._queue.clear()
+
+    def close(self) -> None:
+        try:
+            self._write(b"STOP\n")
+        except Exception:  # porta gia' chiusa
+            pass
         close = getattr(self._ser, "close", None)
         if close:
             close()

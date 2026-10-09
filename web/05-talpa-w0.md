@@ -46,9 +46,14 @@ Si sceglie "Sensore EEG (USB)" (solo Chrome/Edge su computer, da `localhost` o h
 
 1. **Avviso** (V-07, V-08): batteria (il browser dice se il computer e' in carica: in tal caso blocca),
    consenso, istruzioni del produttore. Si spunta per procedere.
-2. **Collega**: `SerialSource` (Web Serial, 115200 baud) legge **una riga ASCII per campione** (`parseLine`,
-   stessa regola di `sources.parse_line`, verificata sugli stessi esempi). Mostra righe valide/scartate e,
-   se non arriva nulla, l'ultima riga ricevuta (per capire il formato vero del firmware).
+2. **Collega**: `SerialSource` (Web Serial, 115200 baud) parla il **protocollo reale del firmware**
+   (`chords.mjs`), letto dallo sketch `provaBCI.ino` (Upside Down Labs "Chords", scheda UNO-CLONE, 6 canali):
+   dopo l'apertura della porta attende 2,2 s (l'Arduino si riavvia), invia `WHORU` (risposta = nome
+   scheda), poi `START`; riceve **pacchetti binari** a 250 Hz: `C7 7C`, contatore, 6 x (alto, basso) a 10 bit,
+   `01` (16 byte). Il lettore si risincronizza se arrivano byte estranei, conta i pacchetti **persi** dal
+   contatore e invia `STOP` alla chiusura. **Verificato sul codice del firmware, non su dati reali.** Si sceglie il
+   canale (di solito A0); il controllo mostra la variazione di tutti e sei per aiutare a trovare quello giusto.
+   Il protocollo ASCII (una riga per campione) del Python resta disponibile nel codice ma non e' quello del firmware.
 3. **Controllo (6 s, fermo)**: frequenza **misurata** dai tempi di arrivo (avvisa se si discosta del 10% da
    250), segnale piatto, fondo scala, rete a 50 Hz (`quality.mjs`, parita' con `dsp.signal_quality`).
 4. **Calibrazione** (protocollo `v1`, 4 blocchi da 60 s: rilassamento, sottrazioni, rilassamento,
@@ -59,7 +64,7 @@ Si sceglie "Sensore EEG (USB)" (solo Chrome/Edge su computer, da `localhost` o h
 6. **Scarica la registrazione**: un valore per riga (compatibile con il replay del Python); i dati grezzi
    restano solo in memoria finche' non si preme il pulsante (V-05). **Non vanno nel repository.**
 
-Limiti: il blocco "movimenti volontari" non c'e' ancora; i rilevatori di battito, salto e raffica non
+Limiti: **il Python (`sources.SerialSource`) legge ancora solo righe ASCII e non parla questo firmware** (da allineare, V-18); il blocco "movimenti volontari" non c'e' ancora; i rilevatori di battito, salto e raffica non
 esistono (`03`); formato del firmware e 250 Hz non sono verificati; la musica esce dagli altoparlanti del
 computer (cavi vicini agli elettrodi possono disturbare). `?calib=12` accorcia i blocchi **solo per le prove**.
 

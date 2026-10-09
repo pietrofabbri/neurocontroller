@@ -87,3 +87,8 @@ mentale -> coerenza con una condizione -> punteggio, con A che aiuta via musica)
 - **Implementato** (`web/05-talpa-w0.md`): server locale + SQLite (`python3 -m neurocontroller serve`), gioco a due con B **simulato**, musica di A, catena del segnale con **parita' verificata** con il Python (vettori di riferimento), classifica, storico, CSV, cancellazione di un giocatore. R-01, R-04, R-05, R-07, R-08 sono coperti **solo in simulazione**.
 - **Non fatto**: lettura del sensore (Web Serial), pulizia del segnale con rilevatori e protocollo di validazione, gamepad. Nessun EEG vero e' ancora passato dal sistema.
 - R-10 (risultati e statistiche) e' coperto solo **in locale**; "online" resta fuori (V-04).
+
+## Aggiornamento 09/10/2026 (sera) - formato reale del firmware
+
+- Letto lo sketch `provaBCI.ino` (Upside Down Labs "Chords", scheda UNO-CLONE) sul computer del docente: il firmware invia **pacchetti binari** (`C7 7C`, contatore, 6 canali x 2 byte a 10 bit, `01`) a 250 Hz e 115200 baud, **solo dopo il comando `START`** (`WHORU` restituisce il nome della scheda, `STOP` ferma). L'ipotesi precedente (una riga ASCII per campione) era **sbagliata** per questo firmware: `docs/08-calibrazione.md` sez. 6 va letta di conseguenza.
+- Implementato il lettore **binario**: `neurocontroller/sources.py` (`ChordsParser`, `ChordsSerialSource`, ora il default di `--format chords`, con `--channel`) e `web/app/js/chords.mjs`; parita' Python/JavaScript verificata su byte di prova. **Verificato sul codice del firmware, non ancora su dati registrati.**

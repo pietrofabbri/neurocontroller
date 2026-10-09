@@ -1,6 +1,6 @@
 """Prova del flusso 'sensore' nel browser con una porta seriale FINTA (nessun hardware).
 
-La porta finta invia righe ASCII a 250 campioni/s con un segnale sintetico il cui stato (rilassato /
+La porta finta parla il protocollo del firmware (WHORU/START, pacchetti binari C7 7C ... 01) a 250 campioni/s con un segnale sintetico il cui stato (rilassato /
 concentrato) e' deciso dallo script. Verifica collegamento, controllo, calibrazione, partita e salvataggio
 con sorgente 'sensore'. NON prova nulla sul sensore vero. Richiede Playwright con Chromium (facoltativo).
 Uso: python3 tools/prova_web_sensore.py [cartella-screenshot]
@@ -30,15 +30,31 @@ MOCK = r"""
     if (window.__mockJaw > 0) { v += gauss() * 40; window.__mockJaw--; }
     n++; return Math.max(0, Math.min(1023, Math.round(512 + v)));
   }
+  let started = false, outq = [];
+  const enc = (str) => new TextEncoder().encode(str);
+  function packet() {
+    const p = new Uint8Array(16); p[0] = 0xC7; p[1] = 0x7C; p[2] = n & 255;
+    for (let c = 0; c < 6; c++) { const v = c === 0 ? sample() : 512 + Math.round(gauss()); p[3 + 2 * c] = v >> 8; p[4 + 2 * c] = v & 255; }
+    p[15] = 1; return p;
+  }
   const port = {
     async open() {}, async close() {},
+    writable: { getWriter() { return {
+      async write(bytes) {
+        const t = new TextDecoder().decode(bytes).trim().toUpperCase();
+        if (t === 'WHORU') outq.push(enc('UNO-CLONE\r\n'));
+        else if (t === 'START') { started = true; t0 = null; }
+        else if (t === 'STOP') started = false;
+      }, releaseLock() {} }; } },
     readable: { getReader() { let closed = false; return {
       async read() {
+        if (outq.length) return { value: outq.shift(), done: false };
+        if (!started) { await new Promise((r) => setTimeout(r, 30)); return { value: new Uint8Array(0), done: closed }; }
         if (t0 === null) t0 = performance.now();
         const due = t0 + (n + 10) / fs * 1000, wait = due - performance.now();
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-        let s = ''; for (let i = 0; i < 10; i++) s += sample() + '\r\n';
-        return { value: new TextEncoder().encode(s), done: closed };
+        const out = new Uint8Array(160); for (let i = 0; i < 10; i++) out.set(packet(), i * 16);
+        return { value: out, done: closed };
       },
       async cancel() { closed = true; }, releaseLock() {} }; } },
   };

@@ -25,7 +25,7 @@ from .live import LiveError, LiveRunner, LiveUpdate
 from .profile import (Profile, ProfileError, StateClassifier, check_participant_id,
                       next_participant_id)
 from .protocol import default_protocol, scaled
-from .sources import (DEFAULT_FS, PERSONAS, CsvReplaySource, SerialSource, SimulatedSource, Source,
+from .sources import (DEFAULT_FS, PERSONAS, ChordsSerialSource, CsvReplaySource, SerialSource, SimulatedSource, Source,
                       list_serial_ports, pick_port)
 
 DEFAULT_SCRIPT = "relax:12,focus:12,jaw:3,relax:8,focus:8"
@@ -48,7 +48,11 @@ def _add_source_args(p: argparse.ArgumentParser) -> None:
     g.add_argument("--baud", type=int, default=115200)
     g.add_argument("--fs", type=float, default=DEFAULT_FS,
                    help="campioni al secondo del sensore (da verificare con 'check'; default %(default)s)")
-    g.add_argument("--column", type=int, default=0, help="colonna del campione nelle righe di testo")
+    g.add_argument("--format", dest="serial_format", choices=("chords", "ascii"), default="chords",
+                   help="formato dei dati seriali: chords = pacchetti binari del firmware provaBCI (default), "
+                        "ascii = una riga di testo per campione")
+    g.add_argument("--channel", type=int, default=0, help="canale dell'Arduino con il sensore, 0 = A0 (formato chords)")
+    g.add_argument("--column", type=int, default=0, help="colonna del campione nelle righe di testo (formato ascii)")
     g.add_argument("--adc-max", type=float, default=1023.0,
                    help="valore massimo dell'ADC: 1023 = 10 bit (default), 4095 = 12 bit...")
     g.add_argument("--replay-file", help="file con un campione per riga (con --source replay)")
@@ -84,6 +88,9 @@ def _build_source(args: argparse.Namespace, script: Optional[Sequence[Tuple[str,
                            "pip install pyserial), oppure usare --source simulated per provare senza "
                            "sensore. 'python3 -m neurocontroller ports' mostra le porte.")
     try:
+        if args.serial_format == "chords":
+            return ChordsSerialSource(port, baud=args.baud, fs=args.fs, channel=args.channel,
+                                      adc_max=args.adc_max)
         return SerialSource(port, baud=args.baud, fs=args.fs, column=args.column,
                             adc_max=args.adc_max)
     except RuntimeError as exc:

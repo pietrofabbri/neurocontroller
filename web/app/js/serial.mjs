@@ -1,6 +1,9 @@
 // Sorgente da sensore: Web Serial (Chrome/Edge su computer, solo https o localhost; serve un gesto dell'utente).
-// Assunzione ereditata dal Python (sources.parse_line): una riga ASCII per campione, "512" oppure "512,498,...".
-// NON verificato sul firmware modificato dagli studenti (docs/08, sez. 6): per questo si MISURA tutto.
+// Protocollo principale: 'chords' = pacchetti binari del firmware provaBCI (vedi chords.mjs). Il protocollo
+// 'ascii' (una riga per campione, come il Python sources.parse_line) resta come alternativa.
+// Si MISURA tutto (frequenza, pacchetti persi, canali): nulla e' dato per scontato.
+
+import { ChordsParser, BOARDS } from './chords.mjs';
 
 const SPLIT = /[,;\t ]+/;
 
@@ -28,12 +31,21 @@ export class RateMeter {
 }
 
 export class SerialSource {
-  constructor({ baud = 115200, column = 0, onData, onError, onClose } = {}) {
-    this.baud = baud; this.column = column; this.onData = onData; this.onError = onError; this.onClose = onClose;
-    this.port = null; this.reader = null; this.simulated = false; this.bad = 0; this.good = 0; this.running = false;
-    this.lastLine = '';
+  // protocollo 'chords' (binario, come il firmware provaBCI) oppure 'ascii' (una riga per campione)
+  constructor({ protocol = 'chords', baud = 115200, channel = 0, channels = 6, onData, onError, onClose } = {}) {
+    this.protocol = protocol; this.baud = baud; this.channel = channel; this.column = channel;
+    this.onData = onData; this.onError = onError; this.onClose = onClose;
+    this.port = null; this.reader = null; this.writer = null; this.simulated = false; this.running = false;
+    this.bad = 0; this.good = 0; this.lastLine = ''; this.bytes = 0; this.board = null;
+    this.parser = new ChordsParser(channels);
   }
-  get description() { return 'SENSORE seriale @ ' + this.baud + ' baud'; }
+  get description() { return 'SENSORE seriale @ ' + this.baud + ' baud (' + this.protocol + ')'; }
+  get stats() { return { bytes: this.bytes, packets: this.parser.packets, lost: this.parser.lost, skipped: this.parser.skipped, text: this.parser.text, board: this.board }; }
+  async send(text) {
+    if (!this.port || !this.port.writable) return;
+    if (!this.writer) this.writer = this.port.writable.getWriter();
+    await this.writer.write(new TextEncoder().encode(text));
+  }
   // Va chiamata da un gesto dell'utente (click): il browser mostra l'elenco delle porte.
   async connect() {
     if (!serialSupported()) throw new Error('Questo browser non supporta la porta seriale: serve Chrome o Edge su computer.');
@@ -41,6 +53,15 @@ export class SerialSource {
     await this.port.open({ baudRate: this.baud });
     this.running = true;
     this._loop();
+    if (this.protocol === 'chords') {
+      await new Promise((r) => setTimeout(r, 2200));            // l'Arduino si riavvia quando si apre la porta
+      this.parser.text = '';
+      await this.send('WHORU\n');
+      await new Promise((r) => setTimeout(r, 700));
+      const m = /([A-Z0-9-]{4,})/.exec(this.parser.text.replace(/\s+/g, ' ').toUpperCase());
+      if (m && BOARDS[m[1]]) { this.board = m[1]; this.parser.channels = BOARDS[m[1]]; }
+      await this.send('START\n');
+    }
   }
   async _loop() {
     const dec = new TextDecoder('ascii'); let buf = '';
@@ -51,16 +72,25 @@ export class SerialSource {
           for (;;) {
             const { value, done } = await this.reader.read();
             if (done) break;
-            const tMs = performance.now();
+            const tMs = performance.now(); this.bytes += value.length;
+            if (this.protocol === 'chords') {
+              const pk = this.parser.push(value);
+              if (pk.length && this.onData) {
+                const all = []; for (let c = 0; c < this.parser.channels; c++) all.push(Float32Array.from(pk, (p) => p.values[c]));
+                this.good += pk.length;
+                this.onData(all[Math.min(this.channel, all.length - 1)], tMs, all);
+              }
+              continue;
+            }
             buf += dec.decode(value, { stream: true });
             const lines = buf.split(/\r?\n/); buf = lines.pop();
-            if (buf.length > 4096) buf = '';                     // niente righe: non e' testo
+            if (buf.length > 4096) buf = '';
             const out = [];
             for (const l of lines) {
               const v = parseLine(l, this.column);
               if (v === null) { this.bad++; if (l.trim()) this.lastLine = l.slice(0, 40); } else { this.good++; out.push(v); }
             }
-            if (out.length && this.onData) this.onData(Float32Array.from(out), tMs);
+            if (out.length && this.onData) this.onData(Float32Array.from(out), tMs, [Float32Array.from(out)]);
           }
         } finally { this.reader.releaseLock(); }
         if (!this.running) break;
@@ -70,7 +100,9 @@ export class SerialSource {
     if (this.onClose) this.onClose();
   }
   async close() {
+    try { if (this.protocol === 'chords') await this.send('STOP\n'); } catch (e) { /* porta gia' chiusa */ }
     this.running = false;
+    try { if (this.writer) { this.writer.releaseLock(); this.writer = null; } } catch (e) { /* ok */ }
     try { if (this.reader) await this.reader.cancel(); } catch (e) { /* gia' chiusa */ }
     try { if (this.port) await this.port.close(); } catch (e) { /* gia' chiusa */ }
   }

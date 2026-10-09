@@ -53,7 +53,7 @@ export class FlussoSensore {
     try {
       this.worker = new Worker(new URL('./worker.mjs', import.meta.url), { type: 'module' });
       this.worker.onmessage = (e) => this.daWorker(e.data);
-      this.src = new SerialSource({ onData: (a, t) => this.dati(a, t), onError: (e) => this.msg('Errore della porta: ' + e.message, 'err'),
+      this.src = new SerialSource({ protocol: 'chords', channel: +this.$('s-canale').value, onData: (a, t, all) => this.dati(a, t, all), onError: (e) => this.msg('Errore della porta: ' + e.message, 'err'),
         onClose: () => { if (this.fase !== 'chiuso') this.msg('La porta seriale si è chiusa (cavo scollegato?).', 'err'); } });
       await this.src.connect();
     } catch (e) { this.msg(e.name === 'NotFoundError' ? 'Nessuna porta scelta.' : 'Non riesco ad aprire la porta: ' + e.message, 'err'); return; }
@@ -62,17 +62,22 @@ export class FlussoSensore {
     this.$('s-check').innerHTML = 'Controllo del segnale: stai <b>fermo/a, occhi aperti, a riposo</b> per ' + CHECK_S + ' secondi…';
     this.timer = setInterval(() => this.tickCheck(), 500);
   }
-  dati(arr, tMs) {
+  dati(arr, tMs, all) {
     this.raw.push(arr); this.ultimoDato = tMs;
-    if (this.fase === 'check') { this.rate.add(arr.length, tMs); for (const v of arr) this.checkBuf.push(v); }
+    if (this.fase === 'check') {
+      this.rate.add(arr.length, tMs); for (const v of arr) this.checkBuf.push(v);
+      if (all) { this.checkAll = this.checkAll || all.map(() => []); all.forEach((a, c) => { for (const v of a) this.checkAll[c].push(v); }); }
+    }
     else if (this.worker && (this.fase === 'calib' || this.fase === 'gioco' || this.fase === 'live')) this.worker.postMessage({ type: 'campioni', data: arr });
-    const c = this.$('s-conn'); c.textContent = 'Righe valide: ' + this.src.good + ' · scartate: ' + this.src.bad;
+    const st = this.src.stats;
+    this.$('s-conn').textContent = 'Pacchetti: ' + st.packets + ' · persi: ' + st.lost + (st.board ? ' · scheda ' + st.board : '');
   }
   tickCheck() {
     const el = this.$('s-check');
     if (this.src.good === 0 && performance.now() - this.tCheck > 3000) {
-      el.innerHTML = '<span class="sem bad">nessun dato</span> Non arrivano righe leggibili' + (this.src.lastLine ? ' (ultima riga ricevuta: «' + this.src.lastLine.replace(/</g, '&lt;') + '»)' : '') +
-        '. Controlla baud (qui 115200), porta e che l\'Arduino stia inviando.';
+      const st = this.src.stats, t = st.text.replace(/</g, '&lt;').slice(0, 120);
+      el.innerHTML = '<span class="sem bad">nessun dato</span> Arrivano ' + st.bytes + ' byte, ' + st.packets + ' pacchetti validi' + (t ? '; testo ricevuto: «' + t + '»' : '') +
+        '. ' + (st.bytes === 0 ? 'Non arriva nulla: porta sbagliata, porta occupata (chiudi il monitor seriale dell\'Arduino IDE) o cavo.' : 'Arrivano byte ma non pacchetti nel formato atteso (C7 7C … 01, 115200 baud): controlla il firmware.');
       return;
     }
     if (performance.now() - this.tCheck < CHECK_S * 1000) return;
@@ -88,6 +93,7 @@ export class FlussoSensore {
     const grave = !q.ok || !fsM || fsM < 60;
     this.fs = fsM >= 60 ? fsM : 250;
     el.innerHTML = '<span class="sem ' + (grave ? 'bad' : probs.length ? 'warn' : 'ok') + '">' + (grave ? 'da sistemare' : probs.length ? 'attenzione' : 'segnale ok') + '</span> ' +
+      'pacchetti persi <b>' + this.src.stats.lost + '</b> su ' + this.src.stats.packets + ' · ' + this.canali() + '<br>' +
       'frequenza misurata <b>' + Math.round(fsM) + '</b> campioni/s · variazione (dev. standard) <b>' + q.std.toFixed(1) + '</b> · sul fondo scala ' + Math.round(100 * q.clipFraction) + '% · rete 50 Hz ' + q.mainsRatio.toFixed(2) +
       (probs.length ? '<ul>' + probs.map((p) => '<li>' + p + '</li>').join('') + '</ul>' : '') +
       '<div class="muted">Controllo grossolano: dice se ha senso procedere, non che sia EEG.</div>';
@@ -96,6 +102,11 @@ export class FlussoSensore {
     this.$('s-scarica').hidden = false;
     this.$('s-live').hidden = false; this.worker.postMessage({ type: 'calibra-inizio', fs: this.fs });
     this.msg(grave ? 'Risolvi i problemi qui sopra e ricollega, poi riprova.' : 'Puoi procedere con la calibrazione.');
+  }
+  canali() {
+    if (!this.checkAll) return '';
+    const sd = (a) => { const m = a.reduce((x, y) => x + y, 0) / a.length; return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / a.length); };
+    return 'canali (variazione): ' + this.checkAll.map((a, c) => 'A' + c + (c === this.src.channel ? '★' : '') + ' ' + sd(a).toFixed(1)).join(' · ') + ' (★ = usato)';
   }
   calibra() {
     this.fase = 'calib'; this.idx = -1; this.$('s-calibra').hidden = true; this.$('s-live').hidden = true; this.$('s-calib').hidden = false;
