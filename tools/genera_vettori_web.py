@@ -84,7 +84,25 @@ def classificatore():
             "profilo": {"artifact": art, "state": stato}, "sequenza": seq}
 
 
+def righe_e_qualita():
+    from neurocontroller import sources
+    casi = [("512", 0), ("512,498,3", 0), ("512,498,3", 1), ("512,498,3", 5), (" 512 \r\n", 0), ("abc", 0), ("", 0),
+            ("A0:512", 0), ("512 498\t3", 1), ("-3.5", 0), ("1e3", 0), ("+7", 0), (".5", 0), ("5.", 0), ("12abc", 0),
+            ("512;498", 1), ("  ", 0), ("0", 0), ("1023", 0), ("5,,6", 1)]
+    righe = [{"riga": r, "col": c, "atteso": sources.parse_line(r.encode("ascii"), c)} for r, c in casi]
+    qualita = []
+    for nome, n, fs, comp, rum, adc in [("buono", 1024, 250.0, [(10.0, 8, 0.3), (20.0, 4, 1.0)], 2.0, None),
+                                         ("piatto", 512, 250.0, [], 0.0, None),
+                                         ("rete", 1024, 250.0, [(50.0, 40, 0.0), (10.0, 2, 0.0)], 0.5, None),
+                                         ("saturo", 1024, 250.0, [(10.0, 600, 0.0)], 0.0, None)]:
+        x = [round(max(0.0, min(1023.0, v)), 6) for v in segnale(n, fs, 21, comp, rumore=rum)]
+        q = dsp.signal_quality(x, fs)
+        qualita.append({"nome": nome, "fs": fs, "x": x, "ok": q["ok"], "std": q["std"], "clip": q["clip_fraction"],
+                        "mains": q["mains_ratio"], "problemi": len(q["problems"])})
+    return {"righe": righe, "qualita": qualita}
+
+
 if __name__ == "__main__":
     out = ROOT / "web" / "app" / "test" / "vettori.json"
-    out.write_text(json.dumps({"finestre": finestre(), "classificatore": classificatore()}, separators=(",", ":")), encoding="utf-8")
+    out.write_text(json.dumps({"finestre": finestre(), "classificatore": classificatore(), **righe_e_qualita()}, separators=(",", ":")), encoding="utf-8")
     print("scritto", out, out.stat().st_size, "byte")

@@ -2,6 +2,7 @@
 import { Music, PRESET, norm } from './music.mjs';
 import * as api from './api.mjs';
 import { drawWorld, drawScope } from './view.mjs';
+import { FlussoSensore, sensoreDisponibile } from './sensore.mjs';
 
 const core = window.NC.core;
 const $ = (id) => document.getElementById(id);
@@ -18,7 +19,7 @@ window.__S = S;   // utile per le prove automatiche
 /* ------------------------------------------------------------------ schermate */
 function mostra(nome) {
   S.schermata = nome;
-  for (const id of ['home', 'gioco', 'fine']) $(id).hidden = id !== nome;
+  for (const id of ['home', 'gioco', 'fine', 'sensore']) $(id).hidden = id !== nome;
 }
 const msgHome = (t, cls = '') => { const m = $('home-msg'); m.textContent = t; m.className = 'msg ' + cls; };
 
@@ -91,6 +92,7 @@ $('avvia').onclick = async () => {
     S.A = $('selA').value; S.B = $('selB').value;
     if (!S.A || !S.B || S.A === S.B) { msgHome('Servono due giocatori diversi: A guida, B è la mente che scava.', 'err'); return; }
     S.persona = $('sorgente').value; S.durata = +$('durata').value;
+    if (S.persona === 'sensore') { if (!S.flusso) S.flusso = new FlussoSensore($, { onGioca: (f) => avviaPartita(), onEsci: () => { S.flusso = null; mostra('home'); aggiornaHome(); } }); S.flusso.apri(); mostra('sensore'); return; }
     avviaPartita();
   } catch (e) { msgHome(e.message, 'err'); }
 };
@@ -112,7 +114,7 @@ function avviaPartita() {
   const sim = S.persona !== 'sensore';
   const personaSegnale = S.persona === 'manuale' ? 'tipica' : S.persona;
   S.game = new core.Partita({ durata: S.durata, seme });
-  S.mente = new core.Mente(S.persona, seme + 3);
+  S.mente = sim ? new core.Mente(S.persona, seme + 3) : null;
   S.serie = []; S.serieT = 0; S.menteT = 0; S.ultimoStato = null; S.onda = []; S.uMente = 0.5; S.pronto = null; S.riga = null;
   S.fase = 'attesa'; S.keys.clear();
   $('badge-sim').hidden = !sim;
@@ -120,11 +122,16 @@ function avviaPartita() {
   S.music.set(PRESET.neutro); aggiornaSlider();
   S.music.start(+$('vol').value);
   mostra('gioco'); if (document.activeElement) document.activeElement.blur();
-  overlay('Preparo B…<br><small>calibrazione rapida del segnale simulato</small>');
-  S.worker = new Worker(new URL('./worker.mjs', import.meta.url), { type: 'module' });
-  S.worker.onmessage = onWorker;
-  S.worker.onerror = (e) => overlay('Errore nell\'elaborazione del segnale: ' + (e.message || 'sconosciuto'));
-  S.worker.postMessage({ type: 'avvia', persona: personaSegnale, seed: seme });
+  if (sim) {
+    overlay('Preparo B…<br><small>calibrazione rapida del segnale simulato</small>');
+    S.worker = new Worker(new URL('./worker.mjs', import.meta.url), { type: 'module' });
+    S.worker.onmessage = onWorker;
+    S.worker.onerror = (e) => overlay('Errore nell\'elaborazione del segnale: ' + (e.message || 'sconosciuto'));
+    S.worker.postMessage({ type: 'avvia', persona: personaSegnale, seed: seme });
+  } else {
+    overlay('Sto leggendo il sensore di B…<br><small>profilo calibrato in questa sessione</small>');
+    S.worker = S.flusso.worker; S.worker.onmessage = onWorker; S.flusso.fase = 'gioco';
+  }
   S.prev = performance.now();
   cancelAnimationFrame(S.raf); S.raf = requestAnimationFrame(ciclo);
 }
@@ -151,9 +158,11 @@ function ciclo(now) {
   const g = S.game;
   if (S.fase === 'corsa') {
     const manuale = (S.keys.has('KeyX') ? 1 : 0) - (S.keys.has('KeyZ') ? 1 : 0);
-    const s = S.mente.passo(dt, norm(S.music.p), manuale);
-    S.menteT += dt;
-    if (S.menteT >= 0.1) { S.menteT = 0; S.uMente = (s + 1) / 2; S.worker.postMessage({ type: 'mente', u: S.uMente }); }
+    if (S.mente) {
+      const s = S.mente.passo(dt, norm(S.music.p), manuale);
+      S.menteT += dt;
+      if (S.menteT >= 0.1) { S.menteT = 0; S.uMente = (s + 1) / 2; S.worker.postMessage({ type: 'mente', u: S.uMente }); }
+    }
     const st = S.ultimoStato;
     const inp = {
       sterzo: (S.keys.has('ArrowRight') ? 1 : 0) - (S.keys.has('ArrowLeft') ? 1 : 0),
@@ -199,7 +208,9 @@ function disegna(now) {
 /* ------------------------------------------------------------------ fine e salvataggio */
 function finePartita() {
   S.fase = 'fine';
-  S.music.stop(); if (S.worker) { S.worker.postMessage({ type: 'ferma' }); S.worker.terminate(); S.worker = null; }
+  S.music.stop();
+  if (S.persona === 'sensore') { if (S.flusso) S.flusso.fase = 'profilo'; S.worker = null; }
+  else if (S.worker) { S.worker.postMessage({ type: 'ferma' }); S.worker.terminate(); S.worker = null; }
   const g = S.game, st = g.st, sim = S.persona !== 'sensore';
   const durata = Math.max(g.t, 1e-9);
   S.riga = {
@@ -227,7 +238,7 @@ async function salva() {
 }
 $('f-riprova').onclick = salva;
 $('f-ancora').onclick = () => avviaPartita();
-$('f-home').onclick = () => { mostra('home'); aggiornaHome(); };
+$('f-home').onclick = () => { if (S.flusso) { S.flusso.chiudi(); S.flusso = null; } mostra('home'); aggiornaHome(); };
 
 function disegnaRiepilogo() {
   const c = $('riepilogo').getContext('2d'), W = 720, H = 180, s = S.serie;
@@ -260,8 +271,11 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => S.keys.delete(e.code));
 window.addEventListener('blur', () => S.keys.clear());
 function annulla() {
-  S.fase = 'idle'; S.music.stop(); if (S.worker) { S.worker.terminate(); S.worker = null; }
+  S.fase = 'idle'; S.music.stop();
+  if (S.persona === 'sensore') { if (S.flusso) { S.flusso.chiudi(); S.flusso = null; } S.worker = null; }
+  else if (S.worker) { S.worker.terminate(); S.worker = null; }
   mostra('home'); msgHome('Partita interrotta: non è stata salvata.'); aggiornaHome();
 }
 
 aggiornaHome();
+if (sensoreDisponibile()) { const o = $('opt-sensore'); o.disabled = false; o.textContent = 'Sensore EEG (USB): Arduino + elettrodi'; }

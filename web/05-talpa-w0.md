@@ -1,8 +1,10 @@
 # 05 - La talpa (tappa W0): cosa esiste, come si usa, cosa manca
 
-*Stato al 9 ottobre 2026. **Implementato:** gioco a due con B simulato, musica di A, elaborazione del
-segnale con parita' verificata, database locale. **Non implementato:** lettura del sensore vero,
-gamepad, validazione della pulizia (`03`). Nessun EEG vero e' mai passato da qui.*
+*Stato al 9 ottobre 2026 (sera). **Implementato:** gioco a due con B simulato, musica di A, elaborazione
+del segnale con parita' verificata, database locale, **flusso del sensore via Web Serial (collegamento,
+controllo, calibrazione, gioco, vista dal vivo, scarico della registrazione)**. Il flusso del sensore e'
+provato **solo con una porta seriale finta** (`tools/prova_web_sensore.py`): **nessun EEG vero e' ancora
+passato da qui.** Non implementato: gamepad, rilevatori di pulizia (`03`, sez. 4.2-4.4).*
 
 ## 1. Come si avvia
 
@@ -37,6 +39,29 @@ le partite restano **nel browser di chi gioca**, non sono condivise tra computer
 cancellano i dati del sito (il CSV scaricabile e' la copia); la classifica e' quindi **personale**. Per
 una classifica comune a piu' persone serve il server locale su un solo computer. La pagina dice sempre
 in quale modo sta lavorando. Prova automatica di entrambi i modi: `tools/prova_web_e2e.py [--statico]`.
+
+## 2c. Il sensore (W1b, prima versione)
+
+Si sceglie "Sensore EEG (USB)" (solo Chrome/Edge su computer, da `localhost` o https). Passi, in `sensore.mjs`:
+
+1. **Avviso** (V-07, V-08): batteria (il browser dice se il computer e' in carica: in tal caso blocca),
+   consenso, istruzioni del produttore. Si spunta per procedere.
+2. **Collega**: `SerialSource` (Web Serial, 115200 baud) legge **una riga ASCII per campione** (`parseLine`,
+   stessa regola di `sources.parse_line`, verificata sugli stessi esempi). Mostra righe valide/scartate e,
+   se non arriva nulla, l'ultima riga ricevuta (per capire il formato vero del firmware).
+3. **Controllo (6 s, fermo)**: frequenza **misurata** dai tempi di arrivo (avvisa se si discosta del 10% da
+   250), segnale piatto, fondo scala, rete a 50 Hz (`quality.mjs`, parita' con `dsp.signal_quality`).
+4. **Calibrazione** (protocollo `v1`, 4 blocchi da 60 s: rilassamento, sottrazioni, rilassamento,
+   moltiplicazioni; 5 s di assestamento scartati) -> profilo e verdetto come nel Python (d', accuratezza
+   bilanciata, soglie `Q_USABLE_*`). **Solo con profilo affidabile si puo' giocare** (V-12).
+5. **Vista dal vivo** (anche con profilo debole): stato stimato, punteggio, segnale e bande; **nessun
+   punto, nulla salvato nel database**.
+6. **Scarica la registrazione**: un valore per riga (compatibile con il replay del Python); i dati grezzi
+   restano solo in memoria finche' non si preme il pulsante (V-05). **Non vanno nel repository.**
+
+Limiti: il blocco "movimenti volontari" non c'e' ancora; i rilevatori di battito, salto e raffica non
+esistono (`03`); formato del firmware e 250 Hz non sono verificati; la musica esce dagli altoparlanti del
+computer (cavi vicini agli elettrodi possono disturbare). `?calib=12` accorcia i blocchi **solo per le prove**.
 
 ## 3. Il gioco (R-01 ... R-07)
 
@@ -86,15 +111,16 @@ musicali** attivi (per studiare, dopo, l'effetto della musica: ipotesi, non risu
 | `web/app/js/core.js` | regole del gioco (senza DOM, provate con Node) |
 | `web/app/js/dsp.mjs`, `classifier.mjs`, `pipeline.mjs`, `simulata.mjs`, `worker.mjs` | segnale |
 | `web/app/js/music.mjs` | musica di A (Web Audio) |
+| `web/app/js/serial.mjs`, `quality.mjs`, `sensore.mjs` | sensore: Web Serial, controllo del segnale, flusso di calibrazione |
+| `tools/prova_web_sensore.py` | prova del flusso del sensore con porta seriale finta (facoltativa) |
 | `web/app/js/main.mjs`, `view.mjs`, `api.mjs`, `archivio_locale.mjs` | schermate, disegno, archivio (server o browser) |
 | `web/app/test/` | prove Node (`node --test web/app/test/*.test.*js`) |
 | `tools/prova_web_e2e.py` | partita lampo nel browser (richiede Playwright, facoltativo) |
 
 ## 7. Cosa manca (in ordine)
 
-1. **`SerialSource` (W1b):** Web Serial dal filo principale, misura della frequenza reale, errori
-   visibili; calibrazione vera con il protocollo `v1` (rilassamento / concentrazione) al posto di quella
-   simulata. Si fa quando arriva il sensore.
+1. **Prima sessione con il sensore vero (W1b):** provare il flusso di 2c, annotare formato delle righe,
+   frequenza misurata, esito del controllo e della calibrazione; scaricare la registrazione per analizzarla.
 2. **Validazione della pulizia (W1c):** rilevatori di battiti, salti, raffiche (`03`, sez. 4) e
    protocollo a blocchi (sez. 6). **Senza questa, con il sensore vero il gioco non e' affidabile.**
 3. **Controller di A (gamepad)** e, se serve, i "due gruppi di comandi" di R-03 (`WD-G`).

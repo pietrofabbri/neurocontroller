@@ -3,10 +3,49 @@
 // Gira nel Web Worker (V-17) ma si prova anche in Node.
 
 import { analyzeWindow, windowSize } from './dsp.mjs';
-import { buildProfile, StateClassifier } from './classifier.mjs';
+import { buildProfile, StateClassifier, isArtifact } from './classifier.mjs';
 import { SimulatedSource } from './simulata.mjs';
 
 export const HOP_FRACTION = 0.25;   // passo = un quarto della finestra (125 su 512), come il Python
+
+// Finestre scorrevoli di caratteristiche, senza classificatore (per calibrare).
+export class WindowStream {
+  constructor(fs, { windowLen = windowSize(fs), hop = Math.round(windowSize(fs) * HOP_FRACTION) } = {}) {
+    this.fs = fs; this.n = windowLen; this.hop = hop; this.buf = new Float64Array(this.n); this.filled = 0; this.since = 0; this.total = 0;
+  }
+  push(samples) {
+    const out = [];
+    for (let i = 0; i < samples.length; i++) {
+      this.buf.copyWithin(0, 1); this.buf[this.n - 1] = samples[i]; this.total++;
+      if (this.filled < this.n) this.filled++;
+      if (this.filled === this.n && ++this.since >= this.hop) {
+        this.since = 0;
+        const f = analyzeWindow(this.buf, this.fs);
+        out.push({ rms: f.rms, hfRatio: f.hfRatio, engagement: f.engagement });
+      }
+    }
+    return out;
+  }
+}
+
+// Soglie di qualita' del profilo (euristiche: neurocontroller/profile.py, Q_USABLE_*, Q_WEAK_*).
+export const Q_USABLE_DPRIME = 1.5, Q_USABLE_ACC = 0.80, Q_WEAK_DPRIME = 0.8;
+export function balancedAccuracy(relaxE, focusE, thr) {
+  const r = relaxE.filter((v) => v < thr).length / relaxE.length, f = focusE.filter((v) => v >= thr).length / focusE.length;
+  return (r + f) / 2;
+}
+export function profileLevel(dprime, acc) {
+  return dprime >= Q_USABLE_DPRIME && acc >= Q_USABLE_ACC ? 'affidabile' : dprime >= Q_WEAK_DPRIME ? 'debole' : 'non affidabile';
+}
+// Profilo + verdetto, da finestre di rilassamento e di concentrazione.
+export function profileFromWindows(relax, focus) {
+  const p = buildProfile(relax, focus), ok = (f) => !isArtifact(f.rms, f.hfRatio, p.artifact);
+  const er = relax.filter(ok).map((f) => f.engagement), ef = focus.filter(ok).map((f) => f.engagement);
+  p.accuracy = balancedAccuracy(er, ef, p.state.threshold);
+  p.level = profileLevel(p.state.dprime, p.accuracy);
+  p.windows = { relax: relax.length, focus: focus.length, relaxClean: er.length, focusClean: ef.length };
+  return p;
+}
 
 export class Pipeline {
   constructor(fs, profile, { windowLen = windowSize(fs), hop = Math.round(windowSize(fs) * HOP_FRACTION) } = {}) {
@@ -50,7 +89,5 @@ export function windowsAt(persona, seed, u, fs, count) {
 export function quickProfile(persona, seed, fs = 250, count = 120) {
   const relax = windowsAt(persona, seed * 2 + 1, 0, fs, count);
   const focus = windowsAt(persona, seed * 2 + 2, 1, fs, count);
-  const p = buildProfile(relax, focus);
-  p.level = p.state.dprime >= 1.5 ? 'affidabile' : p.state.dprime >= 0.8 ? 'debole' : 'non affidabile';
-  return p;
+  return profileFromWindows(relax, focus);
 }

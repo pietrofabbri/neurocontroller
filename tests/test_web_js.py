@@ -25,7 +25,7 @@ class VettoriTests(unittest.TestCase):
         """Il file dei vettori corrisponde a cio' che il Python calcola oggi (niente deriva silenziosa)."""
         mod = _carica_generatore()
         salvati = json.loads((APP / "test" / "vettori.json").read_text(encoding="utf-8"))
-        ora = json.loads(json.dumps({"finestre": mod.finestre(), "classificatore": mod.classificatore()}))
+        ora = json.loads(json.dumps({"finestre": mod.finestre(), "classificatore": mod.classificatore(), **mod.righe_e_qualita()}))
         # Non si confronta bit per bit: sin() e sum() differiscono di pochissimo tra sistemi e versioni di Python
         # (per esempio sum() e' piu' preciso dalla 3.12). Una deriva vera dell'algoritmo e' molto piu' grande.
         self._vicini(salvati, ora, "vettori")

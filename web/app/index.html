@@ -37,7 +37,7 @@
           <option value="debole">Persona simulata · poco reattiva</option>
           <option value="nulla">Persona simulata · che non reagisce</option>
           <option value="manuale">Tastiera: B gioca con Z (rilassa) e X (concentra)</option>
-          <option value="sensore" disabled>Sensore EEG (USB) · in arrivo con il controller</option>
+          <option value="sensore" id="opt-sensore" disabled>Sensore EEG (USB) · serve Chrome o Edge</option>
         </select></label>
       <label>Durata
         <select id="durata"><option value="20">Prova lampo · 20 secondi</option><option value="120">Prova · 2 minuti</option><option value="600" selected>Partita · 10 minuti</option></select></label>
@@ -67,6 +67,45 @@
         <p class="muted">La cancellazione toglie dal database anche le partite in cui compare.</p>
       </details>
     </div>
+  </div>
+</section>
+
+<!-- ============ SENSORE ============ -->
+<section id="sensore" class="screen" hidden>
+  <div class="card wide">
+    <h2>Collega il sensore di B</h2>
+    <div class="box warn">
+      <b>Prima di mettere il sensore</b>
+      <ul>
+        <li>Il computer deve essere <b>a batteria</b>, <b>scollegato dal caricatore</b> (e lontano da cavi di rete). <span id="s-batt" class="muted"></span></li>
+        <li>Segui le istruzioni del produttore del sensore. Elettrodi solo su pelle integra.</li>
+        <li>Se B è minorenne serve il <b>consenso</b> di chi ne ha la responsabilità. Si può interrompere in qualsiasi momento.</li>
+        <li>È un esperimento: lo stato di B è una <b>stima</b>, non una misura medica.</li>
+      </ul>
+      <label class="inline"><input id="s-ok" type="checkbox"> Ho letto e va bene (batteria, consenso, istruzioni del produttore)</label>
+    </div>
+    <div class="row wrap">
+      <button id="s-collega" class="primary" type="button" disabled>1 · Collega l'Arduino</button>
+      <span id="s-conn" class="muted"></span>
+    </div>
+    <div id="s-check" class="box" hidden></div>
+    <div id="s-calib" class="box" hidden>
+      <h3 id="s-blocco"></h3>
+      <p id="s-istr"></p>
+      <div id="s-punto" class="punto">+</div>
+      <div class="bar"><i id="s-barra"></i></div>
+      <p id="s-tempo" class="muted"></p>
+    </div>
+    <div id="s-esito" class="box" hidden></div>
+    <canvas id="s-scope" width="480" height="110" hidden></canvas>
+    <div class="row wrap">
+      <button id="s-calibra" type="button" hidden>2 · Calibra (circa 5 minuti)</button>
+      <button id="s-gioca" class="primary" type="button" hidden>▶ Gioca con il sensore</button>
+      <button id="s-live" type="button" hidden>Vista dal vivo (senza gioco)</button>
+      <button id="s-scarica" type="button" hidden>⬇ Scarica la registrazione</button>
+      <button id="s-esci" type="button">Esci</button>
+    </div>
+    <p id="s-msg" class="msg" role="status"></p>
   </div>
 </section>
 
