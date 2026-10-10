@@ -41,7 +41,8 @@ nell'orientamento alle scuole medie) e puo' accogliere **altre cuffie** in futur
 | [`04-piano-e-accettazione.md`](04-piano-e-accettazione.md) | Tappe W0-W4 con criteri di accettazione, rischi, decisioni aperte |
 | [`05-talpa-w0.md`](05-talpa-w0.md) | La talpa: come si avvia, regole del gioco, sensore, database, cosa manca, prima prova reale |
 | [`06-dati-ricerca.md`](06-dati-ricerca.md) | **Dizionario dei dati**, protocollo di raccolta, etica e privacy, limiti, analisi |
-| [`07-secondo-parametro-mentale.md`](07-secondo-parametro-mentale.md) | Proposta (non implementata) di un secondo parametro controllabile con la mente |
+| [`07-secondo-parametro-mentale.md`](07-secondo-parametro-mentale.md) | Proposta di un secondo parametro mentale: **accantonata** dal docente il 10/10/2026 (resta come archivio) |
+| [`08-percorso-attenzione.md`](08-percorso-attenzione.md) | Proposta di percorso didattico sull'attenzione (contemplative studies) per le medie, con la talpa come tappa finale disaccoppiata |
 | [`app/`](app/) | il codice (HTML, JavaScript, CSS: nessuna compilazione, V-14) |
 
 ## Come leggere questi documenti
