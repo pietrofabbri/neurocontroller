@@ -1,5 +1,6 @@
 // Flusso del sensore vero: collegamento -> controllo del segnale -> calibrazione -> gioco o vista dal vivo.
-// Segue web/03-pulizia-del-segnale.md (L1) e il protocollo v1 di neurocontroller/protocol.py.
+// Segue web/03-pulizia-del-segnale.md (L1) e il protocollo v1 di neurocontroller/protocol.py, con blocchi dimezzati
+// (30 s invece di 60 s, 'web-v1-30s'): il d' si stima su meno finestre, quindi e' meno stabile (web/05, sez. 2c).
 // NIENTE e' verificato su EEG vero: tutto viene misurato e mostrato. Dati grezzi solo in memoria (V-05),
 // scaricabili solo con un clic dell'utente.
 import { SerialSource, RateMeter, serialSupported } from './serial.mjs';
@@ -8,12 +9,12 @@ import { drawScope } from './view.mjs';
 
 const COMUNE = 'Resta fermo/a, non parlare, non serrare la mascella. Tieni lo sguardo sul punto fisso (il segno + sullo schermo).';
 export const BLOCCHI = [
-  { key: 'relax_1', ruolo: 'relax', titolo: 'Rilassamento a occhi aperti (1)', durata: 60, istr: COMUNE + ' Respira lentamente: 4 secondi per inspirare, 6 per espirare. Lascia andare i pensieri.' },
-  { key: 'focus_1', ruolo: 'focus', titolo: 'Calcolo mentale: sottrazioni (1)', durata: 60, istr: COMUNE + ' Parti da 1000 e sottrai 7 di seguito, a mente (993, 986, 979…). Se sbagli, riparti da dove ricordi. NON dire i numeri ad alta voce.' },
-  { key: 'relax_2', ruolo: 'relax', titolo: 'Rilassamento a occhi aperti (2)', durata: 60, istr: COMUNE + ' Come prima: respiro lento, 4 secondi dentro e 6 fuori.' },
-  { key: 'focus_2', ruolo: 'focus', titolo: 'Calcolo mentale: moltiplicazioni (2)', durata: 60, problemi: true, istr: COMUNE + ' Compariranno delle moltiplicazioni: calcolale a mente, senza dire il risultato. Non importa se non fai in tempo.' },
+  { key: 'relax_1', ruolo: 'relax', titolo: 'Rilassamento a occhi aperti (1)', durata: 30, istr: COMUNE + ' Respira lentamente: 4 secondi per inspirare, 6 per espirare. Lascia andare i pensieri.' },
+  { key: 'focus_1', ruolo: 'focus', titolo: 'Calcolo mentale: sottrazioni (1)', durata: 30, istr: COMUNE + ' Parti da 1000 e sottrai 7 di seguito, a mente (993, 986, 979…). Se sbagli, riparti da dove ricordi. NON dire i numeri ad alta voce.' },
+  { key: 'relax_2', ruolo: 'relax', titolo: 'Rilassamento a occhi aperti (2)', durata: 30, istr: COMUNE + ' Come prima: respiro lento, 4 secondi dentro e 6 fuori.' },
+  { key: 'focus_2', ruolo: 'focus', titolo: 'Calcolo mentale: moltiplicazioni (2)', durata: 30, problemi: true, istr: COMUNE + ' Compariranno delle moltiplicazioni: calcolale a mente, senza dire il risultato. Non importa se non fai in tempo.' },
 ];
-const TRIM = 5, PAUSA = 6, CHECK_S = 6;
+const TRIM = 4, PAUSA = 6, CHECK_S = 6;   // blocchi di 30 s (dimezzati il 10/10/2026): 26 s utili dopo l'assestamento
 // SOLO PER LE PROVE AUTOMATICHE: ?calib=12 accorcia i blocchi (con il sensore vero non si usa).
 const CALIB_PROVA = +(new URLSearchParams(typeof location !== 'undefined' ? location.search : '').get('calib') || 0);
 const durataBlocco = (b) => (CALIB_PROVA >= 10 ? CALIB_PROVA : b.durata);

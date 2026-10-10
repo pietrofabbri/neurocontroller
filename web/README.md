@@ -1,8 +1,9 @@
 # web/ - versione web del neurocontroller
 
-> **Stato (9 ottobre 2026): tappa W0 implementata** - la **talpa** con B simulato, musica di A, database
-> locale (`05-talpa-w0.md`). Si avvia con `python3 -m neurocontroller serve`. Il sensore vero **non** e' ancora
-> collegato e la pulizia del segnale e' ancora solo progettata (`03`).
+> **Stato (10 ottobre 2026): app W0.2** - la **talpa** (partita di 5 minuti, terreni a 5 livelli, ostacoli e gemme),
+> musica di A a 3 cursori, database locale con scheda del partecipante e consenso (`05-talpa-w0.md`, `06-dati-ricerca.md`).
+> Si avvia con `python3 -m neurocontroller serve`. Il sensore vero e' stato collegato e **una partita e' stata giocata**,
+> ma il segnale e' risultato molto disturbato: la pulizia del segnale (`03`) e' ancora solo progettata.
 
 ## Che cos'e'
 
@@ -13,7 +14,7 @@ installare nulla, in cui
   browser) oppure, in assenza di sensore, da una **persona simulata**;
 - il **giocatore A** usa un controller tradizionale (tastiera o gamepad) e fa variare la **musica** per
   aiutare B a restare nello stato mentale giusto;
-- si gioca in due, in **10 minuti**, con un punteggio condiviso.
+- si gioca in due, in **5 minuti** (richiesta originale: 10; dimezzati il 10/10/2026), con un punteggio condiviso.
 
 E' la stessa richiesta originale (`docs/02-richieste-originali.md`, R-01...R-09), su una piattaforma
 che si presta anche ad altro: si puo' **far vedere** a chi non ha mai visto il progetto (per esempio
@@ -38,7 +39,9 @@ nell'orientamento alle scuole medie) e puo' accogliere **altre cuffie** in futur
 | [`02-architettura.md`](02-architettura.md) | Moduli, flusso dei dati, cosa si eredita dal codice Python, piattaforma browser |
 | [`03-pulizia-del-segnale.md`](03-pulizia-del-segnale.md) | **La "bella pulizia"**: disturbi, rilevatori, protocollo di validazione, limiti |
 | [`04-piano-e-accettazione.md`](04-piano-e-accettazione.md) | Tappe W0-W4 con criteri di accettazione, rischi, decisioni aperte |
-| [`05-talpa-w0.md`](05-talpa-w0.md) | **Cio' che esiste**: come si avvia, regole della talpa, catena del segnale, database, cosa manca |
+| [`05-talpa-w0.md`](05-talpa-w0.md) | La talpa: come si avvia, regole del gioco, sensore, database, cosa manca, prima prova reale |
+| [`06-dati-ricerca.md`](06-dati-ricerca.md) | **Dizionario dei dati**, protocollo di raccolta, etica e privacy, limiti, analisi |
+| [`07-secondo-parametro-mentale.md`](07-secondo-parametro-mentale.md) | Proposta (non implementata) di un secondo parametro controllabile con la mente |
 | [`app/`](app/) | il codice (HTML, JavaScript, CSS: nessuna compilazione, V-14) |
 
 ## Come leggere questi documenti

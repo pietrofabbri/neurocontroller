@@ -123,3 +123,9 @@ omessi da questo repository):
   "punto di partenza" e "obiettivo", ed e' cosi' che questo repository le tratta.
 - Una frase del testo F2 ("Da mps a ps") e' riportata cosi' com'e': il significato
   esatto non e' stato confermato.
+
+## Variazioni richieste dal docente dopo la stesura originale
+
+Le richieste R-01...R-10 sopra restano come furono scritte. Le variazioni successive sono tracciate in `web/01-decisioni-e-vincoli.md`:
+
+- **10/10/2026 (WD-5)** - R-01: la durata della partita passa da **10 a 5 minuti** (anche la calibrazione e' dimezzata). R-06: i terreni diventano **cinque livelli** con stati intermedi di B, con piu' tipi di ostacolo e gemme. R-04/R-05: la musica ha **al massimo tre cursori** (ritmo, quante note, morbidezza del timbro) e **nessuna percussione nel rilassamento**. Si aggiunge la raccolta di dati per una possibile **ricerca** (scheda anonima del partecipante, consenso).

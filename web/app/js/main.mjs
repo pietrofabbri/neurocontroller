@@ -1,5 +1,5 @@
 // Schermate e ciclo di gioco della talpa. Il nucleo di gioco e' in core.js (senza DOM, provato con Node).
-import { Music, PRESET, norm } from './music.mjs';
+import { Music, PRESET, norm, indiceFocus, livelloPercussioni } from './music.mjs';
 import * as api from './api.mjs';
 import { drawWorld, drawScope } from './view.mjs';
 import { FlussoSensore, sensoreDisponibile } from './sensore.mjs';
@@ -7,12 +7,14 @@ import { FlussoSensore, sensoreDisponibile } from './sensore.mjs';
 const core = window.NC.core;
 const $ = (id) => document.getElementById(id);
 const clamp = core.clamp;
+const NOMI_TERRENO = { soffice: 'SOFFICE', morbido: 'MORBIDO', medio: 'MEDIO', duro: 'DURO', compatto: 'COMPATTO' };
+const MOTIVI = { ampiezza: 'ampiezza (movimento, ciglia, contatto che balla)', alta_freq: 'alte frequenze (tensione muscolare: fronte, mascella, collo)', entrambi: 'ampiezza e muscoli', vicino_soglia: 'vicino al limite' };
 const NOMI_STATO = { rilassato: 'RILASSATO', concentrato: 'CONCENTRATO', neutro: 'in mezzo (neutro)', artefatto: 'disturbo (nessun punto)' };
 
 const S = {
   schermata: 'home', fase: 'idle', players: [], game: null, mente: null, worker: null, music: new Music(),
-  persona: 'tipica', durata: 600, A: null, B: null, keys: new Set(), ultimoStato: null, onda: [],
-  serie: [], serieT: 0, menteT: 0, prev: 0, raf: 0, uMente: 0.5, riga: null, pronto: null,
+  persona: 'tipica', durata: 300, A: null, B: null, keys: new Set(), ultimoStato: null, onda: [],
+  serie: [], serieT: 0, menteT: 0, prev: 0, raf: 0, uMente: 0.5, riga: null, pronto: null, deriva: null, percN: 0, percTot: 0,
 };
 window.__S = S;   // utile per le prove automatiche
 
@@ -78,11 +80,52 @@ $('csv').onclick = async (e) => {
   const url = URL.createObjectURL(new Blob([await api.csvTesto()], { type: 'text/csv' }));
   const a = document.createElement('a'); a.href = url; a.download = 'partite-talpa.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
 };
+$('csv-serie').onclick = async (e) => {
+  if (api.modoAttuale() === 'server') return;
+  e.preventDefault();
+  const url = URL.createObjectURL(new Blob([await api.csvSerieTesto()], { type: 'text/csv' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'serie-talpa.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
 $('selA').onchange = () => aggiornaStorico().catch(() => {});
 $('del').onclick = async () => {
   const c = $('selDel').value; if (!c) return;
   if (!window.confirm('Cancellare ' + c + ' e tutte le partite in cui compare? Non si può annullare.')) return;
   try { await api.cancellaGiocatore(c); await aggiornaHome(); msgHome(c + ' cancellato.', 'ok'); } catch (e) { msgHome(e.message, 'err'); }
+};
+
+/* ------------------------------------------------------------------ scheda del partecipante e consenso */
+async function consensoMancante() {
+  const giocatori = await api.giocatori();
+  for (const c of [S.A, S.B]) { const p = giocatori.find((x) => x.code === c); if (!p || !p.consent) return c; }
+  return null;
+}
+let schedaCodice = null;
+async function apriScheda(codice) {
+  if (!codice) { msgHome('Scegli prima un giocatore.', 'err'); return; }
+  const p = (await api.giocatori()).find((x) => x.code === codice);
+  if (!p) { msgHome('Giocatore sconosciuto.', 'err'); return; }
+  schedaCodice = codice;
+  $('sc-codice').textContent = codice;
+  $('sc-eta').value = p.age_years == null ? '' : p.age_years;
+  $('sc-genere').value = p.gender || ''; $('sc-mano').value = p.handedness || ''; $('sc-gaming').value = p.gaming || '';
+  $('sc-musica').value = p.music_training || ''; $('sc-studio').value = p.education || '';
+  $('sc-consenso').checked = !!p.consent; $('sc-da').value = p.consent_by || 'persona';
+  $('sc-stato').textContent = p.consent ? 'Consenso registrato il ' + (p.consent_at || '').slice(0, 10) + ' (' + (p.consent_by === 'genitore_tutore' ? 'genitore o tutore' : 'la persona') + ').' : 'Consenso non ancora registrato.';
+  $('sc-msg').textContent = ''; $('sc-msg').className = 'msg';
+  $('scheda').showModal();
+}
+$('schedaA').onclick = () => apriScheda($('selA').value);
+$('schedaB').onclick = () => apriScheda($('selB').value);
+$('sc-annulla').onclick = () => $('scheda').close();
+$('sc-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const v = (id) => $(id).value || null;
+  const eta = $('sc-eta').value === '' ? null : Number($('sc-eta').value);
+  const dati = { age_years: eta, gender: v('sc-genere'), handedness: v('sc-mano'), gaming: v('sc-gaming'), music_training: v('sc-musica'), education: v('sc-studio'),
+    consent: $('sc-consenso').checked ? 1 : 0 };
+  if (dati.consent) dati.consent_by = $('sc-da').value;
+  try { await api.aggiornaGiocatore(schedaCodice, dati); $('scheda').close(); msgHome('Scheda di ' + schedaCodice + ' salvata.', 'ok'); }
+  catch (err) { $('sc-msg').className = 'msg err'; $('sc-msg').textContent = err.message; }
 };
 
 $('avvia').onclick = async () => {
@@ -92,20 +135,26 @@ $('avvia').onclick = async () => {
     S.A = $('selA').value; S.B = $('selB').value;
     if (!S.A || !S.B || S.A === S.B) { msgHome('Servono due giocatori diversi: A guida, B è la mente che scava.', 'err'); return; }
     S.persona = $('sorgente').value; S.durata = +$('durata').value;
+    if (S.persona === 'sensore') {
+      const manca = await consensoMancante();
+      if (manca) { msgHome('Per il sensore serve il consenso di ' + manca + ': apro la scheda.', 'err'); apriScheda(manca); return; }
+    }
     if (S.persona === 'sensore') { if (!S.flusso) S.flusso = new FlussoSensore($, { onGioca: (f) => avviaPartita(), onEsci: () => { S.flusso = null; mostra('home'); aggiornaHome(); } }); S.flusso.apri(); mostra('sensore'); return; }
     avviaPartita();
   } catch (e) { msgHome(e.message, 'err'); }
 };
 
 /* ------------------------------------------------------------------ musica (controlli di A) */
-const ETICHETTE = { tempo: (v) => Math.round(v) + ' bpm', luminosita: pct, densita: pct, registro: pct };
+// Tre cursori soltanto: ritmo, quante note (quantita' e lunghezza), morbidezza del suono (timbro, riverbero).
+const CURSORI = ['tempo', 'densita', 'morbidezza'];
+const ETICHETTE = { tempo: (v) => Math.round(v) + ' bpm', densita: pct, morbidezza: pct };
 function pct(v) { return Math.round(v * 100) + '%'; }
 function aggiornaSlider() {
   const p = S.music.p;
-  for (const k of ['tempo', 'luminosita', 'densita', 'registro']) { $('r-' + k).value = p[k]; $('v-' + k).textContent = ETICHETTE[k](p[k]); }
+  for (const k of CURSORI) { $('r-' + k).value = p[k]; $('v-' + k).textContent = ETICHETTE[k](p[k]); }
+  $('v-perc').textContent = livelloPercussioni(p) > 0 ? 'presenti' : 'assenti';
 }
-for (const k of ['tempo', 'luminosita', 'densita', 'registro']) $('r-' + k).oninput = (e) => { S.music.set({ [k]: +e.target.value }); aggiornaSlider(); e.target.blur(); };
-document.querySelectorAll('[data-preset]').forEach((b) => { b.onclick = () => { S.music.set(PRESET[b.dataset.preset]); aggiornaSlider(); }; });
+for (const k of CURSORI) $('r-' + k).oninput = (e) => { S.music.set({ [k]: +e.target.value }); aggiornaSlider(); e.target.blur(); };
 $('vol').oninput = (e) => S.music.setVolume(+e.target.value);
 
 /* ------------------------------------------------------------------ partita */
@@ -116,10 +165,11 @@ function avviaPartita() {
   S.game = new core.Partita({ durata: S.durata, seme });
   S.mente = sim ? new core.Mente(S.persona, seme + 3) : null;
   S.serie = []; S.serieT = 0; S.menteT = 0; S.ultimoStato = null; S.onda = []; S.uMente = 0.5; S.pronto = null; S.riga = null;
+  S.deriva = new core.Deriva(seme); S.percN = 0; S.percTot = 0;
   S.fase = 'attesa'; S.keys.clear();
   $('badge-sim').hidden = !sim;
   $('keys-b').hidden = !sim;
-  S.music.set(PRESET.neutro); aggiornaSlider();
+  S.music.set(PRESET.neutro); aggiornaSlider();   // si parte a meta': poi i cursori scivolano e A deve guidarli
   S.music.start(+$('vol').value);
   mostra('gioco'); if (document.activeElement) document.activeElement.blur();
   if (sim) {
@@ -134,6 +184,10 @@ function avviaPartita() {
   }
   S.prev = performance.now();
   cancelAnimationFrame(S.raf); S.raf = requestAnimationFrame(ciclo);
+}
+function lampo(tipo) {
+  const c = $('mondo'); c.classList.remove('flash-urto', 'flash-gemma'); void c.offsetWidth; c.classList.add('flash-' + tipo);
+  setTimeout(() => c.classList.remove('flash-' + tipo), 250);
 }
 function overlay(html) { const o = $('overlay'); if (html) { o.innerHTML = html; o.hidden = false; } else o.hidden = true; }
 
@@ -163,12 +217,17 @@ function ciclo(now) {
       S.menteT += dt;
       if (S.menteT >= 0.1) { S.menteT = 0; S.uMente = (s + 1) / 2; S.worker.postMessage({ type: 'mente', u: S.uMente }); }
     }
+    // i cursori di A scivolano da soli: tenere la musica giusta per B richiede attenzione continua
+    const dv = S.deriva.passo(dt), pm = S.music.p;
+    S.music.set({ tempo: pm.tempo + dv[0] * 80, densita: pm.densita + dv[1], morbidezza: pm.morbidezza + dv[2] });
+    aggiornaSlider();
     const st = S.ultimoStato;
     const inp = {
       sterzo: (S.keys.has('ArrowRight') ? 1 : 0) - (S.keys.has('ArrowLeft') ? 1 : 0),
       turbo: S.keys.has('Space') || S.keys.has('ArrowDown'),
       s: st ? clamp(st.score, -1, 1) : 0,
       qualita: st ? st.quality : 'scartata',
+      motivo: st ? (st.reason || '') : '',
     };
     const ev = g.passo(dt, inp);
     S.serieT += dt;
@@ -176,9 +235,12 @@ function ciclo(now) {
       S.serieT -= 1;
       const p = S.music.p, u = g.ultimo;
       S.serie.push({ t: +g.t.toFixed(1), depth_m: +g.profondita.toFixed(2), terrain: u.tipo, state: u.stato,
-        score_b: +inp.s.toFixed(3), quality: { pulita: 1, dubbia: 0.5, scartata: 0 }[inp.qualita], tempo: p.tempo,
-        brightness: p.luminosita, density: p.densita, register: p.registro });
+        score_b: +inp.s.toFixed(3), quality: { pulita: 1, dubbia: 0.5, scartata: 0 }[inp.qualita], coherence: +u.c.toFixed(3),
+        tempo: +p.tempo.toFixed(1), density: +p.densita.toFixed(3), softness: +p.morbidezza.toFixed(3),
+        reason: inp.qualita === 'pulita' ? '' : (inp.motivo || (inp.qualita === 'dubbia' ? 'vicino_soglia' : '')) });
+      S.percTot++; if (livelloPercussioni(p) > 0) S.percN++;
     }
+    if (ev.includes('urto')) lampo('urto'); else if (ev.includes('gemma')) lampo('gemma');
     if (ev.includes('fine')) { finePartita(); return; }
   }
   disegna(now);
@@ -193,13 +255,16 @@ function disegna(now) {
   $('h-prof').textContent = g.profondita.toFixed(1) + ' m';
   $('h-punti').textContent = g.punti();
   const tipo = g.mondo.tipoA(g.profondita + 0.3);
-  $('h-terreno').textContent = tipo === 'compatto' ? 'COMPATTO' : 'SOFFICE';
+  $('h-terreno').textContent = NOMI_TERRENO[tipo] || tipo.toUpperCase();
+  $('h-livello').textContent = '(livello ' + (core.ORDINE_TIPI.indexOf(tipo) + 1) + ' di 5: 1 soffice … 5 compatto)';
   $('h-richiesto').textContent = core.statoRichiesto(tipo).toUpperCase();
   const pc = g.mondo.prossimoCambio(g.profondita);
   $('h-prossimo').textContent = pc ? 'Tra ' + Math.max(0, Math.round(pc.tra)) + ' m: terreno ' + pc.tipo : '';
+  $('h-gemme').textContent = g.st.gemme;
   $('h-stato').textContent = st ? NOMI_STATO[st.state] : '…';
   $('m-score').style.left = (st ? (clamp(st.score, -1, 1) + 1) * 50 : 50) + '%';
-  $('h-qualita').textContent = !st ? '…' : st.quality === 'pulita' ? 'pulito' : st.quality === 'dubbia' ? 'dubbio (nessun punto)' : 'disturbato (nessun punto)';
+  $('h-qualita').textContent = !st ? '…' : st.quality === 'pulita' ? 'pulito' : st.quality === 'dubbia' ? 'dubbio (nessun punto)'
+    : 'disturbato (nessun punto)' + (st.reason && MOTIVI[st.reason] ? ': ' + MOTIVI[st.reason] : '');
   $('h-coerenza').textContent = Math.round(u.c * 100) + '%';
   $('m-coer').style.width = u.c * 100 + '%';
   if (st) { $('c-E').textContent = st.E.toFixed(2); $('c-rms').textContent = st.rms.toFixed(1); $('c-hf').textContent = (st.hfRatio * 100).toFixed(1) + '%'; }
@@ -213,21 +278,39 @@ function finePartita() {
   else if (S.worker) { S.worker.postMessage({ type: 'ferma' }); S.worker.terminate(); S.worker = null; }
   const g = S.game, st = g.st, sim = S.persona !== 'sensore';
   const durata = Math.max(g.t, 1e-9);
+  const ser = S.serie, media = (k) => (ser.length ? ser.reduce((a, r) => a + r[k], 0) / ser.length : null);
+  const fl = S.flusso, prof = sim ? S.pronto : (fl && fl.profilo);
+  const num = (id) => { const v = $(id).value; return v === '' ? null : Number(v); };
   S.riga = {
     player_a: S.A, player_b: S.B, source: sim ? 'simulata' : 'sensore', seed: g.seme,
-    duration_s: +g.t.toFixed(1), depth_m: +g.profondita.toFixed(2), gems: 0, rocks_hit: st.urti,
+    duration_s: +g.t.toFixed(1), depth_m: +g.profondita.toFixed(2), gems: st.gemme, rocks_hit: st.urti,
     coherent_s: +st.tCoerente.toFixed(1), incoherent_s: +st.tIncoerente.toFixed(1), neutral_s: +st.tNeutro.toFixed(1),
     artifact_s: +st.tSospeso.toFixed(1), quality_pct: +(100 * (1 - st.tSospeso / durata)).toFixed(1),
     score: g.punti(), series: S.serie,
+    // metadati per la ricerca (web/06-dati-ricerca.md)
+    app_version: core.CFG.versione, duration_planned_s: g.durata, coherence_mean: +(st.sommaC / (st.tAttivo || 1)).toFixed(3),
+    turbo_s: +st.tTurbo.toFixed(1), dubious_s: +st.tDubbia.toFixed(1), artifact_amp_s: +st.tAmpiezza.toFixed(1), artifact_hf_s: +st.tAltaFreq.toFixed(1),
+    terrain_changes: st.cambiTerreno,
+    tempo_mean: ser.length ? +media('tempo').toFixed(1) : null, density_mean: ser.length ? +media('density').toFixed(3) : null, softness_mean: ser.length ? +media('softness').toFixed(3) : null,
+    percussion_pct: S.percTot ? +(100 * S.percN / S.percTot).toFixed(1) : null,
+    signal_fs_hz: sim ? 250 : (fl ? +fl.fs.toFixed(1) : null),
+    sensor_format: sim || !fl || !fl.src ? null : fl.src.protocol, sensor_baud: sim || !fl || !fl.src ? null : fl.src.baud,
+    profile_level: prof && prof.level ? prof.level : null, profile_dprime: prof && typeof prof.dprime === 'number' ? +prof.dprime.toFixed(3) : null,
+    profile_accuracy: prof && typeof prof.accuracy === 'number' ? +prof.accuracy.toFixed(3) : null,
+    calib_protocol: sim ? 'simulata-rapida' : 'web-v1-30s',
+    b_sleep_h: num('c-sonno'), b_caffeine_3h: num('c-caffe'), b_fatigue: num('c-stanchezza'),
   };
   mostra('fine');
   $('f-titolo').textContent = 'Partita finita · A ' + S.A + ' + B ' + S.B + (sim ? ' (segnale simulato)' : '');
   $('f-prof').textContent = g.profondita.toFixed(1) + ' m';
   $('f-punti').textContent = g.punti();
   $('f-coer').textContent = Math.round(100 * st.sommaC / (st.tAttivo || 1)) + '%';
-  $('f-urti').textContent = st.urti;
+  $('f-urti').textContent = st.urti; $('f-gemme').textContent = st.gemme;
+  $('f-raw').hidden = sim || !(S.flusso && S.flusso.raw && S.flusso.raw.length);
   $('f-dettagli').textContent = 'Tempo coerente ' + Math.round(st.tCoerente) + ' s · in mezzo ' + Math.round(st.tNeutro) + ' s · non coerente ' + Math.round(st.tIncoerente) +
-    ' s · segnale non valido (nessun punto) ' + Math.round(st.tSospeso) + ' s. Nel grafico: la linea è la profondità; sotto, verde = B coerente, grigio = in mezzo, rosso = non coerente, nero = disturbo.';
+    ' s · segnale non valido (nessun punto) ' + Math.round(st.tSospeso) + ' s' +
+    (st.tSospeso > 5 ? ' (per ampiezza: ' + Math.round(st.tAmpiezza) + ' s · per alte frequenze/muscoli: ' + Math.round(st.tAltaFreq) + ' s · dubbio: ' + Math.round(st.tDubbia) + ' s)' : '') +
+    '. Nel grafico: la linea è la profondità; sotto, verde = B coerente con il terreno, grigio = in parte, rosso = non coerente, nero = disturbo.';
   disegnaRiepilogo();
   salva();
 }
@@ -237,6 +320,7 @@ async function salva() {
   catch (e) { m.className = 'msg err'; m.textContent = 'Non sono riuscito a salvare: ' + e.message; $('f-riprova').hidden = false; }
 }
 $('f-riprova').onclick = salva;
+$('f-raw').onclick = () => { if (S.flusso) { S.flusso.scarica(); $('f-salvataggio').textContent += ' · Segnale grezzo scaricato (file locale: non metterlo nel repository).'; } };
 $('f-ancora').onclick = () => avviaPartita();
 $('f-home').onclick = () => { if (S.flusso) { S.flusso.chiudi(); S.flusso = null; } mostra('home'); aggiornaHome(); };
 
@@ -246,7 +330,7 @@ function disegnaRiepilogo() {
   if (s.length < 2) return;
   const maxD = Math.max(1, ...s.map((r) => r.depth_m)), tMax = s[s.length - 1].t || 1, bw = W / s.length;
   s.forEach((r, i) => {
-    const col = r.state === 'artefatto' ? '#000' : r.state === 'neutro' ? '#6b7280' : (r.state === 'concentrato') === (r.terrain === 'compatto') ? '#34d399' : '#f87171';
+    const col = r.state === 'artefatto' ? '#000' : r.coherence >= 0.5 ? '#34d399' : r.coherence >= 0.2 ? '#6b7280' : '#f87171';
     c.fillStyle = col; c.fillRect(i * bw, H - 22, Math.ceil(bw), 14);
   });
   c.strokeStyle = '#f2b84b'; c.lineWidth = 2; c.beginPath();
@@ -261,11 +345,9 @@ window.addEventListener('keydown', (e) => {
   if (CONTROLLATI.has(e.code)) e.preventDefault();
   S.keys.add(e.code);
   if (e.code === 'Escape') { annulla(); return; }
-  const p = S.music.p, d = { KeyQ: ['tempo', 6], KeyA: ['tempo', -6], KeyW: ['luminosita', .05], KeyS: ['luminosita', -.05],
-    KeyE: ['densita', .05], KeyD: ['densita', -.05], KeyR: ['registro', .05], KeyF: ['registro', -.05] }[e.code];
+  const p = S.music.p, d = { KeyQ: ['tempo', 6], KeyA: ['tempo', -6], KeyW: ['densita', .05], KeyS: ['densita', -.05],
+    KeyE: ['morbidezza', .05], KeyD: ['morbidezza', -.05] }[e.code];
   if (d) { S.music.set({ [d[0]]: p[d[0]] + d[1] }); aggiornaSlider(); }
-  const pre = { Digit1: 'calmo', Digit2: 'neutro', Digit3: 'energico' }[e.code];
-  if (pre) { S.music.set(PRESET[pre]); aggiornaSlider(); }
   if (e.code === 'KeyJ' && S.worker && S.persona !== 'sensore') S.worker.postMessage({ type: 'mascella', s: 3 });
 });
 window.addEventListener('keyup', (e) => S.keys.delete(e.code));

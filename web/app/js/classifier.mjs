@@ -41,6 +41,13 @@ export function isArtifact(rms, hfRatio, artifact) {
   return rms > artifact.rms_thr || hfRatio > artifact.hf_thr;
 }
 
+// Perche' una finestra e' stata scartata: '' (non scartata), 'ampiezza' (movimento, ciglia, contatto che balla),
+// 'alta_freq' (troppa energia sopra i 42 Hz: tensione muscolare di fronte, mascella, collo) o 'entrambi'.
+export function artifactReason(rms, hfRatio, artifact) {
+  const a = rms > artifact.rms_thr, h = hfRatio > artifact.hf_thr;
+  return a && h ? 'entrambi' : a ? 'ampiezza' : h ? 'alta_freq' : '';
+}
+
 export function decision(muR, sdR, muF, sdF) {
   sdR = Math.max(sdR, 1e-6); sdF = Math.max(sdF, 1e-6);
   const threshold = (muR * sdF + muF * sdR) / (sdR + sdF);
@@ -75,13 +82,13 @@ export class StateClassifier {
   // quality: 'pulita' | 'dubbia' | 'scartata' (03-pulizia-del-segnale.md)
   update(f) {
     const a = this.profile.artifact;
-    if (isArtifact(f.rms, f.hfRatio, a)) return { state: STATE_ARTIFACT, score: 0, quality: 'scartata', engagement: f.engagement };
+    if (isArtifact(f.rms, f.hfRatio, a)) return { state: STATE_ARTIFACT, score: 0, quality: 'scartata', reason: artifactReason(f.rms, f.hfRatio, a), engagement: f.engagement };
     const score = (f.engagement - this.thr) / this.halfGap;
     this.history.push(score);
     if (this.history.length > this.smooth) this.history.shift();
     const avg = this.history.reduce((x, y) => x + y, 0) / this.history.length;
     const state = avg > this.margin ? STATE_FOCUSED : avg < -this.margin ? STATE_RELAXED : STATE_NEUTRAL;
     const quality = (nearThreshold(f.rms, a.rms_thr, a.rms_median) || nearThreshold(f.hfRatio, a.hf_thr, a.hf_median)) ? 'dubbia' : 'pulita';
-    return { state, score: avg, quality, engagement: f.engagement };
+    return { state, score: avg, quality, reason: quality === 'dubbia' ? 'vicino_soglia' : '', engagement: f.engagement };
   }
 }

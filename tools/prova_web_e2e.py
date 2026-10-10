@@ -37,20 +37,49 @@ def main() -> int:
                 pg.on("console", lambda m: errs.append(m.text) if m.type in ("error", "warning") and not (statico and "404" in m.text) else None)
                 pg.on("pageerror", lambda e: errs.append("PAGEERROR " + str(e)))
                 pg.goto("http://localhost:%s/" % PORT)
+                # scheda del partecipante: solo risposte a scelta, consenso esplicito
+                pg.click("#newA"); pg.wait_for_timeout(300); pg.click("#newB"); pg.wait_for_timeout(300)
+                pg.click("#schedaA")
+                pg.wait_for_selector("#scheda[open]")
+                pg.fill("#sc-eta", "17"); pg.select_option("#sc-genere", "donna"); pg.select_option("#sc-gaming", "1-3h")
+                pg.check("#sc-consenso"); pg.select_option("#sc-da", "genitore_tutore")
+                pg.click("#sc-salva"); pg.wait_for_timeout(500)
+                ok = pg.evaluate("document.getElementById('scheda').open") is False
+                print("scheda salvata e chiusa:", ok)
                 pg.select_option("#durata", "20")
+                pg.click("#condizioni summary"); pg.fill("#c-sonno", "7"); pg.select_option("#c-caffe", "0"); pg.select_option("#c-stanchezza", "2")
                 pg.click("#avvia")
                 pg.wait_for_selector("#gioco:not([hidden])")
+                # tre cursori e nessuna scorciatoia di preset
+                tre = pg.evaluate("[...document.querySelectorAll('#gioco input[type=range]')].map(e => e.id).filter(i => i.startsWith('r-'))")
+                print("cursori di A:", tre)
+                ok = ok and tre == ["r-tempo", "r-densita", "r-morbidezza"] and pg.query_selector("[data-preset]") is None
                 pg.wait_for_timeout(3000)
-                pg.keyboard.press("1")
+                pg.keyboard.press("q")
+                liv = pg.inner_text("#h-livello")
+                ok = ok and "di 5" in liv and pg.inner_text("#h-terreno") in ("SOFFICE", "MORBIDO", "MEDIO", "DURO", "COMPATTO")
+                print("terreno:", pg.inner_text("#h-terreno"), liv)
+                # la deriva muove i cursori da sola
+                v0 = pg.evaluate("window.__S.music.p.tempo + window.__S.music.p.densita * 100 + window.__S.music.p.morbidezza * 100")
+                pg.wait_for_timeout(4000)
+                v1 = pg.evaluate("window.__S.music.p.tempo + window.__S.music.p.densita * 100 + window.__S.music.p.morbidezza * 100")
+                ok = ok and abs(v1 - v0) > 0.01
+                print("deriva dei cursori:", round(v0, 2), "->", round(v1, 2))
                 if out:
                     pg.screenshot(path=str(out / "gioco.png"))
                 pg.wait_for_selector("#fine:not([hidden])", timeout=60000)
                 pg.wait_for_timeout(800)
                 msg = pg.inner_text("#f-salvataggio")
                 print("salvataggio:", msg)
-                ok = "Salvata" in msg and (("browser" in msg) == statico)
+                ok = ok and "Salvata" in msg and (("browser" in msg) == statico)
                 if out:
                     pg.screenshot(path=str(out / "fine.png"))
+                righe = pg.evaluate("""async () => (window.__S.riga ? { v: window.__S.riga.app_version, fs: window.__S.riga.signal_fs_hz, sl: window.__S.riga.b_sleep_h,
+                    caf: window.__S.riga.b_caffeine_3h, fat: window.__S.riga.b_fatigue, prot: window.__S.riga.calib_protocol, tipi: [...new Set(window.__S.serie.map(r => r.terrain))],
+                    kp: Object.keys(window.__S.serie[0]).join(',') } : null)""")
+                print("record:", righe)
+                ok = ok and righe and righe["v"] == "W0.2" and righe["sl"] == 7 and righe["caf"] == 0 and righe["fat"] == 2 and righe["prot"] == "simulata-rapida"
+                ok = ok and righe["kp"] == "t,depth_m,terrain,state,score_b,quality,coherence,tempo,density,softness,reason"
                 pg.click("#f-home")
                 pg.wait_for_timeout(800)
                 classifica = pg.inner_text("#classifica")

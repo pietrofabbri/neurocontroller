@@ -37,6 +37,7 @@ const srv = () => modo === 'server';
 
 export const giocatori = async () => { await rileva(); return srv() ? (await chiama('GET', '/api/players')).players : locale.giocatori(); };
 export const nuovoGiocatore = async (code) => { await rileva(); return srv() ? chiama('POST', '/api/players', code ? { code } : {}) : locale.nuovoGiocatore(code); };
+export const aggiornaGiocatore = async (code, dati) => { await rileva(); return srv() ? chiama('PUT', '/api/players/' + encodeURIComponent(code), dati) : locale.aggiornaGiocatore(code, dati); };
 export const cancellaGiocatore = async (code) => { await rileva(); return srv() ? chiama('DELETE', '/api/players/' + encodeURIComponent(code)) : locale.cancellaGiocatore(code); };
 export const salvaPartita = async (g) => { await rileva(); return srv() ? (await chiama('POST', '/api/games', g)).id : locale.salvaPartita(g); };
 export const partite = async (player, limit = 10) => { await rileva(); return srv()
@@ -44,4 +45,5 @@ export const partite = async (player, limit = 10) => { await rileva(); return sr
 export const classifica = async (limit = 10) => { await rileva(); return srv() ? (await chiama('GET', '/api/leaderboard?limit=' + limit)).games : locale.classifica(limit); };
 export const serie = async (id) => { await rileva(); return srv() ? (await chiama('GET', '/api/games/' + id + '/series')).series : locale.serie(id); };
 export const csvTesto = async () => { await rileva(); return srv() ? (await fetch('/api/export.csv')).text() : locale.csv(); };
+export const csvSerieTesto = async () => { await rileva(); return srv() ? (await fetch('/api/export-series.csv')).text() : locale.csvSerie(); };
 void L;

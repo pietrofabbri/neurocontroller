@@ -64,7 +64,7 @@ export class Pipeline {
         this.sinceLast = 0;
         const f = analyzeWindow(this.buf, this.fs);
         const r = this.clf.update({ rms: f.rms, hfRatio: f.hfRatio, engagement: f.engagement });
-        out.push({ t: this.total / this.fs, state: r.state, score: r.score, quality: r.quality,
+        out.push({ t: this.total / this.fs, state: r.state, score: r.score, quality: r.quality, reason: r.reason,
                    rms: f.rms, hfRatio: f.hfRatio, E: f.engagement, rel: f.rel });
       }
     }

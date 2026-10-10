@@ -19,17 +19,19 @@
   <div class="cols">
     <div class="card">
       <h2>Nuova partita</h2>
-      <p class="muted">Due giocatori, un solo obiettivo: far scendere la talpa il più in profondità in 10 minuti.
+      <p class="muted">Due giocatori, un solo obiettivo: far scendere la talpa il più in profondità in 5 minuti.
         <b>A</b> guida la talpa e sceglie la musica. <b>B</b> ascolta e prova a rilassarsi o a concentrarsi, secondo il terreno.</p>
       <div class="row">
         <label>Giocatore A <small>(guida + musica)</small>
           <select id="selA"></select></label>
         <button id="newA" class="small" type="button">+ nuovo</button>
+        <button id="schedaA" class="small" type="button" title="Scheda del partecipante e consenso">scheda</button>
       </div>
       <div class="row">
         <label>Giocatore B <small>(la sua mente scava)</small>
           <select id="selB"></select></label>
         <button id="newB" class="small" type="button">+ nuovo</button>
+        <button id="schedaB" class="small" type="button" title="Scheda del partecipante e consenso">scheda</button>
       </div>
       <label>Chi dà il segnale di B?
         <select id="sorgente">
@@ -40,7 +42,17 @@
           <option value="sensore" id="opt-sensore" disabled>Sensore EEG (USB) · serve Chrome o Edge</option>
         </select></label>
       <label>Durata
-        <select id="durata"><option value="20">Prova lampo · 20 secondi</option><option value="120">Prova · 2 minuti</option><option value="600" selected>Partita · 10 minuti</option></select></label>
+        <select id="durata"><option value="20">Prova lampo · 20 secondi</option><option value="60">Prova · 1 minuto</option><option value="300" selected>Partita · 5 minuti</option></select></label>
+      <details class="note" id="condizioni"><summary>Come sta B oggi (facoltativo, utile per la ricerca)</summary>
+        <div class="row wrap">
+          <label>Ore di sonno stanotte <input id="c-sonno" type="number" min="0" max="24" step="0.5" placeholder="es. 7"></label>
+          <label>Caffè o tè forte nelle ultime 3 ore
+            <select id="c-caffe"><option value="">non lo dico</option><option value="1">sì</option><option value="0">no</option></select></label>
+          <label>Stanchezza ora
+            <select id="c-stanchezza"><option value="">non lo dico</option><option value="1">1 · riposato</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 · molto stanco</option></select></label>
+        </div>
+        <p class="muted">Niente dati sanitari: solo abitudini del giorno. Si salvano con la partita di B.</p>
+      </details>
       <button id="avvia" class="primary" type="button">▶ Inizia</button>
       <p id="home-msg" class="msg" role="status"></p>
       <p id="modo" class="msg" hidden></p>
@@ -51,6 +63,7 @@
           <li>Con il sensore vero: per i minorenni serve il consenso di chi ne ha la responsabilità; si può smettere in qualsiasi momento; computer <b>a batteria</b>, scollegato dal caricatore; seguire le istruzioni del produttore; elettrodi solo su pelle integra.</li>
           <li>Se il segnale è sporco (occhi chiusi forte, mascella, cavo mosso) la talpa <b>non</b> prende punti: stringere i denti non fa vincere.</li>
           <li>Si usano solo codici (P01, P02…), mai nomi. I dati restano su questo computer.</li>
+          <li>Per giocare con il sensore serve la <b>scheda</b> compilata e il <b>consenso</b> di A e di B (o di chi ne ha la responsabilità). Nella scheda ci sono solo risposte a scelta: età, genere, mano, abitudini di gioco e di musica. Nessun dato sanitario.</li>
         </ul></details>
     </div>
 
@@ -61,6 +74,7 @@
       <ul id="storico" class="lista"></ul>
       <div class="row wrap">
         <a id="csv" class="btnlink" href="/api/export.csv" download="partite-talpa.csv">⬇ Scarica tutte le partite (CSV)</a>
+        <a id="csv-serie" class="btnlink" href="/api/export-series.csv" download="serie-talpa.csv">⬇ Scarica le serie (CSV)</a>
       </div>
       <details class="note"><summary>Gestione dei giocatori</summary>
         <div class="row"><select id="selDel"></select><button id="del" class="small danger" type="button">Cancella giocatore e le sue partite</button></div>
@@ -101,7 +115,7 @@
     <div id="s-esito" class="box" hidden></div>
     <canvas id="s-scope" width="480" height="110" hidden></canvas>
     <div class="row wrap">
-      <button id="s-calibra" type="button" hidden>2 · Calibra (circa 5 minuti)</button>
+      <button id="s-calibra" type="button" hidden>2 · Calibra (circa 3 minuti)</button>
       <button id="s-gioca" class="primary" type="button" hidden>▶ Gioca con il sensore</button>
       <button id="s-live" type="button" hidden>Vista dal vivo (senza gioco)</button>
       <button id="s-scarica" type="button" hidden>⬇ Scarica la registrazione</button>
@@ -120,12 +134,13 @@
     </div>
     <aside class="panel">
       <div class="hud">
-        <div><span class="k">Tempo</span><b id="h-tempo">10:00</b></div>
+        <div><span class="k">Tempo</span><b id="h-tempo">5:00</b></div>
         <div><span class="k">Profondità</span><b id="h-prof">0.0 m</b></div>
         <div><span class="k">Punti</span><b id="h-punti">0</b></div>
+        <div><span class="k">Gemme</span><b id="h-gemme">0</b></div>
       </div>
       <div class="box">
-        <div class="k">Terreno ora</div><b id="h-terreno">—</b>
+        <div class="k">Terreno ora</div><b id="h-terreno">—</b> <span id="h-livello" class="muted"></span>
         <div class="k">B deve essere</div><b id="h-richiesto">—</b>
         <div class="k" id="h-prossimo"></div>
       </div>
@@ -140,14 +155,9 @@
       <div class="box">
         <div class="k">🎵 Musica per B (solo tu, A)</div>
         <label>Ritmo <span id="v-tempo"></span><input id="r-tempo" type="range" min="60" max="140" step="1"></label>
-        <label>Suono chiaro <span id="v-luminosita"></span><input id="r-luminosita" type="range" min="0" max="1" step="0.01"></label>
         <label>Quante note <span id="v-densita"></span><input id="r-densita" type="range" min="0" max="1" step="0.01"></label>
-        <label>Acuto <span id="v-registro"></span><input id="r-registro" type="range" min="0" max="1" step="0.01"></label>
-        <div class="row wrap">
-          <button class="small" data-preset="calmo" type="button">1 · calma</button>
-          <button class="small" data-preset="neutro" type="button">2 · medio</button>
-          <button class="small" data-preset="energico" type="button">3 · carica</button>
-        </div>
+        <label>Suono morbido <span id="v-morbidezza"></span><input id="r-morbidezza" type="range" min="0" max="1" step="0.01"></label>
+        <div class="k">Percussioni: <b id="v-perc">assenti</b></div>
         <label class="inline"><input id="vol" type="range" min="0" max="1" step="0.05" value="0.5"> volume</label>
       </div>
       <details class="box" id="cofano"><summary>Sotto il cofano</summary>
@@ -156,7 +166,7 @@
       </details>
       <p class="keys">
         <b>A</b>: ← → guida · ↓ / spazio scavo veloce (più rischio)<br>
-        Musica: Q/A ritmo · W/S chiaro · E/D note · R/F acuto · 1 2 3 preset<br>
+        Musica: Q/A ritmo · W/S note · E/D morbido (i cursori scivolano da soli: tienili dove serve a B)<br>
         <span id="keys-b">B simulato: Z rilassa · X concentra · J mascella (prova)</span><br>
         Esc: interrompi
       </p>
@@ -172,7 +182,8 @@
       <div><span class="k">Profondità</span><b id="f-prof">—</b></div>
       <div><span class="k">Punti</span><b id="f-punti">—</b></div>
       <div><span class="k">Coerenza media</span><b id="f-coer">—</b></div>
-      <div><span class="k">Rocce urtate</span><b id="f-urti">—</b></div>
+      <div><span class="k">Ostacoli urtati</span><b id="f-urti">—</b></div>
+      <div><span class="k">Gemme</span><b id="f-gemme">—</b></div>
     </div>
     <canvas id="riepilogo" width="720" height="180"></canvas>
     <p id="f-dettagli" class="muted"></p>
@@ -180,11 +191,39 @@
     <div class="row wrap">
       <button id="f-ancora" class="primary" type="button">↺ Un'altra partita</button>
       <button id="f-riprova" type="button" hidden>Riprova a salvare</button>
+      <button id="f-raw" type="button" hidden>⬇ Scarica il segnale grezzo di questa sessione</button>
       <button id="f-home" type="button">Torna all'inizio</button>
     </div>
   </div>
 </section>
 </main>
+
+<!-- ============ SCHEDA DEL PARTECIPANTE ============ -->
+<dialog id="scheda" aria-labelledby="sc-titolo">
+  <form method="dialog" id="sc-form">
+    <h2 id="sc-titolo">Scheda di <span id="sc-codice"></span></h2>
+    <p class="muted">Solo risposte a scelta, tutte facoltative tranne il consenso per giocare con il sensore. Nessun nome, nessun dato sanitario. I dati restano su questo computer e si possono cancellare in qualsiasi momento (Gestione dei giocatori).</p>
+    <div class="row wrap">
+      <label>Età (anni) <input id="sc-eta" type="number" min="5" max="99" step="1"></label>
+      <label>Genere <select id="sc-genere"><option value="">—</option><option value="donna">donna</option><option value="uomo">uomo</option><option value="altro">altro</option><option value="nd">preferisco non dirlo</option></select></label>
+      <label>Mano che usa di più <select id="sc-mano"><option value="">—</option><option value="destra">destra</option><option value="sinistra">sinistra</option><option value="ambidestra">ambidestra</option><option value="nd">preferisco non dirlo</option></select></label>
+    </div>
+    <div class="row wrap">
+      <label>Videogiochi <select id="sc-gaming"><option value="">—</option><option value="mai">mai</option><option value="1-3h">1–3 ore a settimana</option><option value="4-10h">4–10 ore</option><option value="oltre10h">oltre 10 ore</option><option value="nd">preferisco non dirlo</option></select></label>
+      <label>Musica (studio di uno strumento) <select id="sc-musica"><option value="">—</option><option value="nessuna">nessuno</option><option value="meno2">meno di 2 anni</option><option value="2-5">2–5 anni</option><option value="oltre5">oltre 5 anni</option><option value="nd">preferisco non dirlo</option></select></label>
+      <label>Scuola o lavoro <select id="sc-studio"><option value="">—</option><option value="medie">scuola media</option><option value="superiori">scuola superiore</option><option value="universita">università</option><option value="lavoro">lavoro</option><option value="altro">altro</option><option value="nd">preferisco non dirlo</option></select></label>
+    </div>
+    <fieldset class="box">
+      <legend>Consenso</legend>
+      <label class="inline"><input id="sc-consenso" type="checkbox"> Ho spiegato cosa si misura e come si usano i dati (solo in forma anonima, per capire se e come funziona il gioco); si può smettere in qualsiasi momento.</label>
+      <label>Il consenso è dato da
+        <select id="sc-da"><option value="persona">la persona stessa (maggiorenne)</option><option value="genitore_tutore">un genitore o tutore (minorenne)</option></select></label>
+      <p id="sc-stato" class="muted"></p>
+    </fieldset>
+    <p id="sc-msg" class="msg" role="status"></p>
+    <div class="row wrap"><button id="sc-salva" class="primary" type="submit" value="salva">Salva</button><button id="sc-annulla" type="button">Chiudi</button></div>
+  </form>
+</dialog>
 <script src="js/core.js"></script>
 <script type="module" src="js/main.mjs"></script>
 </body>

@@ -16,9 +16,9 @@
 
   /* ---------- Costanti (tutte modificabili qui, in un posto solo) ---------- */
   var CFG = {
-    versione: 'W0.1',
-    durataPartita: 600,        // secondi: 10 minuti (R-01)
-    durataProva: 120,          // partita di prova
+    versione: 'W0.2',
+    durataPartita: 300,        // secondi: 5 minuti (dimezzata rispetto ai 10 minuti di R-01, richiesta del 10/10/2026)
+    durataProva: 60,           // partita di prova
     margineStato: 0.25,        // come StateClassifier del Python: entro +-0,25 lo stato e' "neutro"
     velBase: 0.25,             // m/s anche senza coerenza (la talpa non si ferma del tutto)
     velExtra: 2.35,            // m/s in piu' con coerenza piena
@@ -27,11 +27,20 @@
     stordimento: 1.4,          // s fermi dopo un urto contro una roccia
     moltStordTurbo: 2.0,       // lo stordimento dura di piu' in turbo
     puntiPerMetro: 10,
+    puntiPerGemma: 80,         // una gemma vale 8 metri: rischiare per prenderla conviene, ma non troppo
+    derivaMusica: 0.03,        // intensita' della deriva casuale dei 3 cursori di A (0 = spenta): A deve tenere il passo
+    pesoMusicaDeriva: 3,       // secondi di memoria della velocita' di deriva
     larghezzaTalpa: 0.075,     // mezza larghezza, in unita' di corsia (la corsia va da -1 a +1)
     campionamentoSerie: 1.0    // secondi tra un punto e l'altro della serie salvata
   };
 
-  var TIPO = { SOFFICE: 'soffice', COMPATTO: 'compatto' };
+  /* Terreni a cinque livelli: dal piu' soffice (B rilassato) al piu' compatto (B concentrato).
+   * I livelli intermedi chiedono a B uno stato intermedio (punteggio di B vicino al valore indicato). */
+  var TIPO = { SOFFICE: 'soffice', MORBIDO: 'morbido', MEDIO: 'medio', DURO: 'duro', COMPATTO: 'compatto' };
+  var ORDINE_TIPI = [TIPO.SOFFICE, TIPO.MORBIDO, TIPO.MEDIO, TIPO.DURO, TIPO.COMPATTO];
+  var LIVELLO = { soffice: -1, morbido: -0.5, medio: 0, duro: 0.5, compatto: 1 };
+  var RICHIESTO = { soffice: 'rilassato', morbido: 'un po\' rilassato', medio: 'a metà (neutro)', duro: 'un po\' concentrato', compatto: 'concentrato' };
+  var OSTACOLO = { ROCCIA: 'roccia', MASSO: 'masso', MOBILE: 'mobile', MURO: 'muro', GEMMA: 'gemma' };
   var STATO = { RILASSATO: 'rilassato', CONCENTRATO: 'concentrato', NEUTRO: 'neutro', ARTEFATTO: 'artefatto' };
   var QUALITA = { PULITA: 'pulita', DUBBIA: 'dubbia', SCARTATA: 'scartata' };
 
@@ -66,14 +75,17 @@
     return STATO.NEUTRO;
   }
 
-  /** Stato richiesto da un terreno (R-07). */
-  function statoRichiesto(tipo) { return tipo === TIPO.COMPATTO ? STATO.CONCENTRATO : STATO.RILASSATO; }
+  /** Stato richiesto da un terreno (R-07), in parole. */
+  function statoRichiesto(tipo) { return RICHIESTO[tipo] || RICHIESTO.medio; }
 
-  /** Coerenza in [0,1] tra il punteggio s di B e il terreno. Zero nella zona neutra. */
-  function coerenza(tipo, s, margine) {
-    var m = margine == null ? CFG.margineStato : margine;
-    var v = (tipo === TIPO.COMPATTO ? s : -s);
-    return clamp((v - m) / (1 - m), 0, 1);
+  /** Punteggio di B che rende piena la coerenza per un terreno (agli estremi 0,9: il +-1 pieno e' raro). */
+  var BERSAGLIO_ESTREMO = 0.9, LARGHEZZA_COERENZA = 0.6;
+  function bersaglioTerreno(tipo) { return (LIVELLO[tipo] == null ? 0 : LIVELLO[tipo]) * BERSAGLIO_ESTREMO; }
+
+  /** Coerenza in [0,1] tra il punteggio s di B e il terreno: piena sul bersaglio, nulla a 0,6 di distanza.
+   *  Sui terreni intermedi il bersaglio e' intermedio, quindi lo stato "neutro" puo' essere quello giusto. */
+  function coerenza(tipo, s) {
+    return clamp(1 - Math.abs(s - bersaglioTerreno(tipo)) / LARGHEZZA_COERENZA, 0, 1);
   }
 
   /** Velocita' di discesa (m/s). */
@@ -81,33 +93,57 @@
     return (CFG.velBase + CFG.velExtra * c) * (turbo ? CFG.moltTurbo : 1);
   }
 
-  /* ---------- Il mondo: strati di terreno e rocce, generati dal seme ---------- */
+  /* ---------- Il mondo: strati di terreno e ostacoli, generati dal seme ---------- */
   function Mondo(seme) {
     this.seme = seme >>> 0;
     this.strati = [];          // { da, a, tipo }
-    this.rocce = [];           // { x, y, rx, ry } (y in metri di profondita')
+    this.rocce = [];           // ostacoli e gemme: { id, tipo, x, y, rx, ry, [amp, freq, fase] } (y in metri di profondita')
     this._r = rng(this.seme);
     this._fine = 0;            // profondita' fino a cui e' stato generato
-    this._tipo = TIPO.SOFFICE;
+    this._idx = 0;             // indice nel terreno (0 = soffice ... 4 = compatto): si parte dal soffice
+    this._prossimoId = 1;
     this.genera(60);
   }
+  /** Prossimo livello di terreno: passi di 1 (spesso), 2 o piu' (qualche volta), mai lo stesso due volte. */
+  Mondo.prototype._nuovoIndice = function () {
+    var r = this._r, passo = r() < 0.55 ? 1 : (r() < 0.6 ? 2 : (r() < 0.6 ? 3 : 4));
+    var su = r() < 0.5 ? 1 : -1, i = this._idx + su * passo;
+    if (i < 0 || i > 4) i = this._idx - su * passo;
+    if (i < 0 || i > 4) i = clamp(this._idx + su, 0, 4);
+    if (i === this._idx) i = this._idx === 4 ? 3 : this._idx + 1;
+    return i;
+  };
+  Mondo.prototype._aggiungi = function (o) { o.id = this._prossimoId++; this.rocce.push(o); };
   Mondo.prototype.genera = function (finoA) {
-    var r = this._r;
+    var r = this._r, self = this;
     while (this._fine < finoA) {
-      var lung = 9 + Math.floor(r() * 17);               // 9-25 m
+      var lung = 7 + Math.floor(r() * 10);                // 7-16 m: i terreni cambiano spesso
       var da = this._fine, a = da + lung;
-      this.strati.push({ da: da, a: a, tipo: this._tipo });
-      // rocce: il primo strato ne ha poche, poi piu' fitte
-      var n = Math.floor(lung / (da < 12 ? 7 : 4.5));
+      this.strati.push({ da: da, a: a, tipo: ORDINE_TIPI[this._idx] });
+      // ostacoli: pochi nel primo tratto, poi sempre piu' fitti e vari
+      var n = Math.floor(lung / (da < 12 ? 7 : (da < 40 ? 3.6 : 2.6)));
       for (var i = 0; i < n; i++) {
-        var y = da + 3 + r() * (lung - 3);
-        this.rocce.push({ x: -0.88 + r() * 1.76, y: y, rx: 0.07 + r() * 0.07, ry: 0.35 + r() * 0.25 });
+        var y = da + 2.5 + r() * (lung - 2.5), q = r(), x = -0.88 + r() * 1.76;
+        if (da < 12 || q < 0.45) self._aggiungi({ tipo: OSTACOLO.ROCCIA, x: x, y: y, rx: 0.07 + r() * 0.07, ry: 0.35 + r() * 0.25 });
+        else if (q < 0.62) self._aggiungi({ tipo: OSTACOLO.MASSO, x: x * 0.8, y: y, rx: 0.17 + r() * 0.10, ry: 0.5 + r() * 0.3 });
+        else if (q < 0.82) {
+          var amp = 0.25 + r() * 0.3, x0 = clamp(x, -0.9 + amp, 0.9 - amp);
+          self._aggiungi({ tipo: OSTACOLO.MOBILE, x: x0, y: y, rx: 0.09, ry: 0.32, amp: amp, freq: 0.12 + r() * 0.16, fase: r() * 6.28 });
+        } else {   // muro con varco: due blocchi ai lati di un passaggio largo circa due talpe
+          var gap = 0.34, c = -0.55 + r() * 1.1, sx = c - gap / 2, dx = c + gap / 2;
+          self._aggiungi({ tipo: OSTACOLO.MURO, x: (-1 + sx) / 2, y: y, rx: (sx + 1) / 2, ry: 0.4 });
+          self._aggiungi({ tipo: OSTACOLO.MURO, x: (1 + dx) / 2, y: y, rx: (1 - dx) / 2, ry: 0.4 });
+        }
       }
+      // gemme: una ogni tanto (rischio contro premio)
+      if (da >= 8 && r() < 0.6) self._aggiungi({ tipo: OSTACOLO.GEMMA, x: -0.8 + r() * 1.6, y: da + 2 + r() * (lung - 3), rx: 0.07, ry: 0.3 });
       this._fine = a;
-      this._tipo = this._tipo === TIPO.SOFFICE ? TIPO.COMPATTO : TIPO.SOFFICE;
-      // ogni tanto lo stesso terreno due volte di fila: l'alternanza non deve essere prevedibile
-      if (r() < 0.22) this._tipo = this._tipo === TIPO.SOFFICE ? TIPO.COMPATTO : TIPO.SOFFICE;
+      this._idx = this._nuovoIndice();
     }
+  };
+  /** Ascissa di un ostacolo al tempo t (i mobili oscillano). */
+  Mondo.prototype.xDi = function (o, t) {
+    return o.tipo === OSTACOLO.MOBILE ? o.x + o.amp * Math.sin(2 * Math.PI * o.freq * t + o.fase) : o.x;
   };
   Mondo.prototype.strato = function (y) {
     this.genera(y + 60);
@@ -128,6 +164,21 @@
     return this.rocce.filter(function (o) { return o.y + o.ry >= da && o.y - o.ry <= a; });
   };
 
+  /* ---------- Deriva dei cursori della musica ----------
+   * Senza che A faccia nulla, i tre cursori scivolano piano e a caso: A non puo' regolare una volta e
+   * poi solo guidare. E' il modo di rendere il compito di A piu' impegnativo (richiesta del 10/10/2026). */
+  function Deriva(seme) { this.r = rng((seme >>> 0) + 17); this.v = [0, 0, 0]; }
+  /** Restituisce gli spostamenti [dTempo, dDensita, dMorbidezza] in unita' normalizzate 0..1. */
+  Deriva.prototype.passo = function (dt, intensita) {
+    var k = intensita == null ? CFG.derivaMusica : intensita, out = [0, 0, 0];
+    if (!k) return out;
+    for (var i = 0; i < 3; i++) {
+      this.v[i] += -this.v[i] * dt / CFG.pesoMusicaDeriva + k * Math.sqrt(dt) * this.r.gauss();
+      out[i] = this.v[i] * dt;
+    }
+    return out;
+  };
+
   /* ---------- La partita ---------- */
   function Partita(opz) {
     opz = opz || {};
@@ -143,7 +194,8 @@
     this.ultimo = { c: 0, stato: STATO.NEUTRO, tipo: TIPO.SOFFICE, sospeso: false, vel: 0 };
     this.st = {                 // statistiche
       tCoerente: 0, tNeutro: 0, tIncoerente: 0, tSospeso: 0, tTurbo: 0, tStordito: 0,
-      urti: 0, sommaC: 0, tAttivo: 0, cambiTerreno: 0
+      urti: 0, sommaC: 0, tAttivo: 0, cambiTerreno: 0, gemme: 0, tDubbia: 0,
+      tAmpiezza: 0, tAltaFreq: 0, urtiPerTipo: {}     // tAmpiezza / tAltaFreq: tempo scartato per ampiezza o per alte frequenze (muscoli)
     };
     this.serie = [];            // [t, profondita, coerenza, stato, tipo, qualita] una volta al secondo
     this._ts = 0;
@@ -154,8 +206,9 @@
 
   /**
    * Avanza di dt secondi.
-   * ingressi: { sterzo: -1..+1, turbo: bool, s: punteggio di B in [-1,+1], qualita: 'pulita'|'dubbia'|'scartata' }
-   * Restituisce un elenco di eventi: 'urto', 'cambio', 'fine'.
+   * ingressi: { sterzo: -1..+1, turbo: bool, s: punteggio di B in [-1,+1], qualita: 'pulita'|'dubbia'|'scartata',
+   *             motivo: '' | 'ampiezza' | 'alta_freq' | 'entrambi' (perche' la finestra e' stata scartata) }
+   * Restituisce un elenco di eventi: 'urto', 'gemma', 'cambio', 'fine'.
    */
   Partita.prototype.passo = function (dt, ingressi) {
     var ev = [];
@@ -189,24 +242,32 @@
       var u = this.scia[this.scia.length - 1];
       if (this.profondita - u[1] >= 0.1) this.scia.push([this.x, this.profondita]);
     }
-    // urti con le rocce
+    // ostacoli e gemme (i mobili sono dove stanno adesso)
     var roc = this.mondo.rocceTra(prof0 - 0.4, this.profondita + 0.4);
     for (var i = 0; i < roc.length; i++) {
       var o = roc[i];
-      if (this._rocceColpite[o.y + ':' + o.x]) continue;
-      if (Math.abs(this.x - o.x) < o.rx + CFG.larghezzaTalpa &&
+      if (this._rocceColpite[o.id]) continue;
+      var ox = this.mondo.xDi(o, this.t);
+      if (Math.abs(this.x - ox) < o.rx + CFG.larghezzaTalpa &&
           this.profondita + 0.3 > o.y - o.ry && prof0 < o.y + o.ry) {
-        this._rocceColpite[o.y + ':' + o.x] = true;
-        this.stordito = CFG.stordimento * (this.turbo ? CFG.moltStordTurbo : 1);
-        this.profondita = Math.max(prof0, o.y - o.ry - 0.3);   // si ferma davanti alla roccia
-        this.x = clamp(o.x + (this.x >= o.x ? 1 : -1) * (o.rx + CFG.larghezzaTalpa + 0.03), -0.95, 0.95);   // e viene spinta di lato
-        this.st.urti++; ev.push('urto');
+        this._rocceColpite[o.id] = true;
+        if (o.tipo === OSTACOLO.GEMMA) { this.st.gemme++; ev.push('gemma'); continue; }
+        var pesante = o.tipo === OSTACOLO.MASSO || o.tipo === OSTACOLO.MURO;
+        this.stordito = CFG.stordimento * (pesante ? 1.3 : 1) * (this.turbo ? CFG.moltStordTurbo : 1);
+        this.profondita = Math.max(prof0, o.y - o.ry - 0.3);   // si ferma davanti all'ostacolo
+        this.x = clamp(ox + (this.x >= ox ? 1 : -1) * (o.rx + CFG.larghezzaTalpa + 0.03), -0.95, 0.95);   // e viene spinta di lato
+        this.st.urti++; this.st.urtiPerTipo[o.tipo] = (this.st.urtiPerTipo[o.tipo] || 0) + 1; ev.push('urto');
         break;
       }
     }
     // statistiche
-    if (sospeso) this.st.tSospeso += dt;
-    else {
+    if (sospeso) {
+      this.st.tSospeso += dt;
+      var mot = inp.motivo || '';
+      if (qual === QUALITA.DUBBIA) this.st.tDubbia += dt;
+      if (mot === 'ampiezza' || mot === 'entrambi') this.st.tAmpiezza += dt;
+      if (mot === 'alta_freq' || mot === 'entrambi') this.st.tAltaFreq += dt;
+    } else {
       this.st.tAttivo += dt; this.st.sommaC += c * dt;
       if (c >= 0.5) this.st.tCoerente += dt; else if (stato === STATO.NEUTRO) this.st.tNeutro += dt; else this.st.tIncoerente += dt;
     }
@@ -222,7 +283,7 @@
     return ev;
   };
 
-  Partita.prototype.punti = function () { return Math.floor(this.profondita * CFG.puntiPerMetro); };
+  Partita.prototype.punti = function () { return Math.floor(this.profondita * CFG.puntiPerMetro) + this.st.gemme * CFG.puntiPerGemma; };
 
   /** Riga da archiviare (V-04, V-05, V-06): solo dati di gioco, codici e nessun nome. */
   Partita.prototype.record = function (meta) {
@@ -243,15 +304,15 @@
       coerenzaMedia: Math.round((st.sommaC / att) * 1000) / 1000,
       tCoerente: Math.round(st.tCoerente), tNeutro: Math.round(st.tNeutro), tIncoerente: Math.round(st.tIncoerente),
       tSospeso: Math.round(st.tSospeso), tTurbo: Math.round(st.tTurbo),
-      urti: st.urti,
-      musica: meta.musica || null,                        // parametri medi (tempo, luminosita, densita)
+      urti: st.urti, gemme: st.gemme,
+      musica: meta.musica || null,                        // parametri medi (tempo, densita, morbidezza)
       serie: meta.conSerie === false ? null : this.serie.slice()
     };
   };
 
   /* ---------- Mente simulata (SOLO per prove e dimostrazioni, V-10) ----------
    * Modello giocattolo, NON scientifico: lo stato s insegue un bersaglio che dipende dalla musica
-   * di A (ritmo lento/scuro/rado -> rilassato; veloce/chiaro/fitto -> concentrato), con inerzia e
+   * di A (ritmo lento/morbido/rado -> rilassato; veloce/secco/fitto -> concentrato), con inerzia e
    * rumore. Serve a far girare il gioco senza sensore; non dimostra nulla sul cervello. */
   var PERSONE = {
     tipica: { guadagno: 1.0, tau: 6, rumore: 0.10 },
@@ -267,7 +328,7 @@
   }
   /** Bersaglio dovuto alla musica: parametri in 0..1 (tempo normalizzato 60..140 -> 0..1). */
   Mente.bersaglioMusica = function (m) {
-    var mt = (m.tempo - 0.5) * 2, mb = (m.luminosita - 0.5) * 2, md = (m.densita - 0.5) * 2;
+    var mt = (m.tempo - 0.5) * 2, mb = (0.5 - m.morbidezza) * 2, md = (m.densita - 0.5) * 2;   // timbro secco = come "chiaro"
     return Math.tanh(1.1 * mt + 0.9 * mb + 0.8 * md);
   };
   /** manuale: -1 (rilassati), 0, +1 (concentrati). */
@@ -289,7 +350,7 @@
     return 'g' + s;
   }
 
-  var CAMPI_NUMERICI = ['durata', 'durataPrevista', 'profondita', 'punti', 'coerenzaMedia', 'tCoerente', 'tNeutro', 'tIncoerente', 'tSospeso', 'tTurbo', 'urti', 'seme'];
+  var CAMPI_NUMERICI = ['durata', 'durataPrevista', 'profondita', 'punti', 'coerenzaMedia', 'tCoerente', 'tNeutro', 'tIncoerente', 'tSospeso', 'tTurbo', 'urti', 'seme', 'gemme'];
   var CAMPI_AMMESSI = ['id', 'versione', 'data', 'giocatoreA', 'giocatoreB', 'sorgente', 'simulata', 'musica', 'serie'].concat(CAMPI_NUMERICI);
 
   /** Controlla un record prima di archiviarlo. Rifiuta nomi e campi sconosciuti. Restituisce un elenco di errori. */
@@ -318,7 +379,7 @@
       migliore: n ? Math.max.apply(null, mie.map(function (p) { return p.profondita; })) : 0,
       media: n ? somma(function (p) { return p.profondita; }) / n : 0,
       coerenzaMedia: n ? somma(function (p) { return p.coerenzaMedia; }) / n : 0,
-      urti: somma(function (p) { return p.urti; }),
+      urti: somma(function (p) { return p.urti; }), gemme: somma(function (p) { return p.gemme || 0; }),
       reali: mie.filter(function (p) { return !p.simulata; }).length,
       andamento: mie.slice().sort(function (a, b) { return a.data < b.data ? -1 : 1; }).map(function (p) { return p.profondita; })
     };
@@ -338,7 +399,7 @@
 
   /** CSV senza la serie (una riga per partita). */
   var COLONNE_CSV = ['id', 'data', 'giocatoreA', 'giocatoreB', 'sorgente', 'simulata', 'durata', 'durataPrevista', 'profondita', 'punti',
-    'coerenzaMedia', 'tCoerente', 'tNeutro', 'tIncoerente', 'tSospeso', 'tTurbo', 'urti', 'seme', 'versione'];
+    'coerenzaMedia', 'tCoerente', 'tNeutro', 'tIncoerente', 'tSospeso', 'tTurbo', 'urti', 'gemme', 'seme', 'versione'];
   function aCSV(partite) {
     var righe = [COLONNE_CSV.join(',')];
     partite.forEach(function (p) {
@@ -360,7 +421,8 @@
   }
 
   NC.core = {
-    CFG: CFG, TIPO: TIPO, STATO: STATO, QUALITA: QUALITA, PERSONE: PERSONE,
+    CFG: CFG, TIPO: TIPO, ORDINE_TIPI: ORDINE_TIPI, LIVELLO: LIVELLO, OSTACOLO: OSTACOLO, STATO: STATO, QUALITA: QUALITA, PERSONE: PERSONE,
+    bersaglioTerreno: bersaglioTerreno, Deriva: Deriva,
     rng: rng, clamp: clamp,
     classificaStato: classificaStato, statoRichiesto: statoRichiesto, coerenza: coerenza, velocita: velocita,
     Mondo: Mondo, Partita: Partita, Mente: Mente,

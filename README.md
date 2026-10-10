@@ -13,7 +13,7 @@ design, deployment, game design).
 
 ## Cos'e' il gioco richiesto
 
-Due giocatori **cooperano** per fare piu' punti possibile in **10 minuti**.
+Due giocatori **cooperano** per fare piu' punti possibile in **10 minuti** (nella versione web, dal 10/10/2026, **5 minuti**).
 **A** usa un controller tradizionale e fa variare la **musica**; **B** usa il controller
 EEG e, guidato dalla musica di A, cambia il proprio stato mentale
 (**concentrato / rilassato**). Il punteggio cresce quando lo stato di B e' coerente con

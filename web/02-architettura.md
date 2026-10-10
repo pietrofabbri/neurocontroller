@@ -107,8 +107,11 @@ semplice per far funzionare il sensore a scuola. Dove pubblicare e' `WD-A`.
 
 ## 6. Musica (A -> B): parametri comandabili
 
-Proposta di insieme minimo di parametri che A puo' variare, da tarare con prove: **tempo**, **densita'
-di note**, **registro (grave/acuto)**, **luminosita' del timbro**, **presenza di un pulso regolare**.
+Proposta iniziale (9/10/2026): **tempo**, **densita' di note**, **registro (grave/acuto)**, **luminosita' del
+timbro**, **presenza di un pulso regolare**. **Sostituita il 10/10/2026 (WD-5)** da **tre soli cursori**:
+**ritmo** (bpm), **quante note** (quantita' e lunghezza) e **morbidezza del timbro** (taglio del filtro, attacco,
+forma d'onda, miscela secco/riverbero); le **percussioni** entrano solo sopra una soglia dell'indice di focus
+(`05-talpa-w0.md`, sez. 3; `web/app/js/music.mjs`). Il registro e il pulso fisso non esistono piu'.
 Le **ipotesi sull'effetto** di questi parametri sullo stato di B vanno trattate come **ipotesi da mettere
 alla prova** (`docs/05`, sezione 1: l'osservazione sui suoni acuti riguarda 5 persone senza gruppo di
 controllo). L'applicazione dovrebbe poter **registrare** (in locale) quali parametri musicali erano

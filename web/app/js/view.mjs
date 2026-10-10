@@ -1,5 +1,9 @@
-// Disegno della partita (schermo di A): la talpa, gli strati di terreno, le rocce.
+// Disegno della partita (schermo di A): la talpa, gli strati di terreno (5 livelli), gli ostacoli, le gemme.
 const PX_PER_M = 38, MOLE_Y = 150;
+const LIV = { soffice: 0, morbido: 1, medio: 2, duro: 3, compatto: 4 };
+const COLORI = ['#dcc08a', '#c4a272', '#9d8466', '#7a655a', '#5d5049'];
+const NOME_TERRENO = { soffice: 'SOFFICE · serve B rilassato', morbido: 'MORBIDO · serve B un po\' rilassato', medio: 'MEDIO · serve B a metà (né l\'uno né l\'altro)',
+  duro: 'DURO · serve B un po\' concentrato', compatto: 'COMPATTO · serve B concentrato' };
 
 export function drawWorld(ctx, W, H, game, now) {
   const lane = W * 0.45, cx = W / 2, prof = game.profondita;
@@ -14,19 +18,21 @@ export function drawWorld(ctx, W, H, game, now) {
   for (const s of game.mondo.strati) {
     if (s.a < dMin || s.da > dMax) continue;
     const top = Math.max(yOf(s.da), 0), bot = Math.min(yOf(s.a), H);
-    const soft = s.tipo === 'soffice';
-    ctx.fillStyle = soft ? '#d8b77a' : '#5d5049';
+    const lv = LIV[s.tipo] == null ? 2 : LIV[s.tipo], soft = lv < 2, hard = lv > 2;
+    ctx.fillStyle = COLORI[lv];
     ctx.fillRect(0, top, W, bot - top);
     ctx.save(); ctx.beginPath(); ctx.rect(0, top, W, bot - top); ctx.clip();
     ctx.strokeStyle = soft ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)'; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 2;
-    if (soft) { for (let y = top - (top % 22); y < bot; y += 22) for (let x = (y / 22 % 2) * 11; x < W; x += 22) { ctx.beginPath(); ctx.arc(x + 6, y + 6, 2, 0, 6.3); ctx.fill(); } }
-    else { for (let k = -H; k < W + H; k += 26) { ctx.beginPath(); ctx.moveTo(k, bot); ctx.lineTo(k + (bot - top), top); ctx.stroke(); } }
+    // il disegno cambia con il livello: puntini (soffice), puntini radi, onde (medio), righe larghe, righe fitte (compatto)
+    if (lv === 0 || lv === 1) { const passo = lv === 0 ? 22 : 34; for (let y = top - (top % passo); y < bot; y += passo) for (let x = (y / passo % 2) * (passo / 2); x < W; x += passo) { ctx.beginPath(); ctx.arc(x + 6, y + 6, 2, 0, 6.3); ctx.fill(); } }
+    else if (lv === 2) { for (let y = top - (top % 30); y < bot; y += 30) { ctx.beginPath(); for (let x = 0; x <= W; x += 12) { const yy = y + Math.sin(x / 18) * 4; if (x) ctx.lineTo(x, yy); else ctx.moveTo(x, yy); } ctx.stroke(); } }
+    else { const passo = lv === 3 ? 40 : 26; for (let k = -H; k < W + H; k += passo) { ctx.beginPath(); ctx.moveTo(k, bot); ctx.lineTo(k + (bot - top), top); ctx.stroke(); } }
     ctx.restore();
     // etichetta (testo, non solo colore: V-20)
     const ly = Math.max(top, 0) + 18;
     if (ly < bot - 6) {
       ctx.font = 'bold 15px system-ui, sans-serif'; ctx.textAlign = 'left';
-      const txt = soft ? 'TERRENO SOFFICE · serve B rilassato' : 'TERRENO COMPATTO · serve B concentrato';
+      const txt = 'TERRENO ' + (NOME_TERRENO[s.tipo] || s.tipo);
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; const w = ctx.measureText(txt).width + 16; ctx.fillRect(8, ly - 15, w, 22);
       ctx.fillStyle = '#fff'; ctx.fillText(txt, 16, ly);
     }
@@ -39,11 +45,24 @@ export function drawWorld(ctx, W, H, game, now) {
     game.scia.forEach(([x, d], i) => { const px = cx + x * lane, py = yOf(d); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
     ctx.lineTo(cx + game.x * lane, MOLE_Y); ctx.stroke();
   }
-  // rocce
+  // ostacoli e gemme
   for (const o of game.mondo.rocceTra(dMin, dMax)) {
-    const px = cx + o.x * lane, py = yOf(o.y);
-    ctx.fillStyle = '#2b2b2f'; ctx.beginPath(); ctx.ellipse(px, py, o.rx * lane, o.ry * PX_PER_M, 0, 0, 6.3); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.ellipse(px - o.rx * lane * 0.3, py - o.ry * PX_PER_M * 0.35, o.rx * lane * 0.4, o.ry * PX_PER_M * 0.25, 0, 0, 6.3); ctx.fill();
+    const ox = game.mondo.xDi(o, game.t), px = cx + ox * lane, py = yOf(o.y), rx = o.rx * lane, ry = o.ry * PX_PER_M;
+    if (o.tipo === 'gemma') {
+      if (game._rocceColpite[o.id]) continue;
+      ctx.fillStyle = '#35e0d0'; ctx.strokeStyle = '#0b6b64'; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.moveTo(px, py - 13); ctx.lineTo(px + 11, py); ctx.lineTo(px, py + 13); ctx.lineTo(px - 11, py); ctx.closePath(); ctx.fill(); ctx.stroke();
+      continue;
+    }
+    if (o.tipo === 'muro') {
+      ctx.fillStyle = '#3a3a40'; ctx.fillRect(px - rx, py - ry, 2 * rx, 2 * ry);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(px - rx, py - ry, 2 * rx, 5);
+      continue;
+    }
+    ctx.fillStyle = o.tipo === 'mobile' ? '#8a3b3b' : o.tipo === 'masso' ? '#46464d' : '#2b2b2f';
+    ctx.beginPath(); ctx.ellipse(px, py, rx, ry, 0, 0, 6.3); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.ellipse(px - rx * 0.3, py - ry * 0.35, rx * 0.4, ry * 0.25, 0, 0, 6.3); ctx.fill();
+    if (o.tipo === 'mobile') { ctx.fillStyle = '#fff'; ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center'; ctx.fillText('↔', px, py + 5); }
   }
   // talpa
   const mx = cx + game.x * lane;

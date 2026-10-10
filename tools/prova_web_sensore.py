@@ -95,6 +95,15 @@ def main() -> int:
                 pg.wait_for_timeout(500)
                 pg.select_option("#sorgente", "sensore")
                 pg.select_option("#durata", "20")
+                pg.select_option("#sorgente", "sensore")
+                pg.click("#avvia")                      # crea due giocatori, ma senza consenso il sensore non parte
+                pg.wait_for_selector("#scheda[open]", timeout=5000)
+                print("senza consenso la scheda si apre da sola:", pg.inner_text("#home-msg"))
+                for lato in ("A", "B"):
+                    if not pg.evaluate("document.getElementById('scheda').open"):
+                        pg.click("#scheda" + lato); pg.wait_for_selector("#scheda[open]")
+                    pg.check("#sc-consenso"); pg.select_option("#sc-da", "persona"); pg.click("#sc-salva"); pg.wait_for_timeout(500)
+                pg.select_option("#durata", "20")
                 pg.click("#avvia")
                 pg.wait_for_selector("#sensore:not([hidden])")
                 pg.check("#s-ok")
@@ -126,6 +135,9 @@ def main() -> int:
                     msg = pg.inner_text("#f-salvataggio")
                     print("salvataggio:", msg, "|", pg.inner_text("#f-titolo"))
                     ok = "Salvata" in msg and "simulato" not in pg.inner_text("#f-titolo")
+                    r = pg.evaluate("({ fmt: window.__S.riga.sensor_format, baud: window.__S.riga.sensor_baud, fs: window.__S.riga.signal_fs_hz, lv: window.__S.riga.profile_level, pr: window.__S.riga.calib_protocol, src: window.__S.riga.source, raw: !document.getElementById('f-raw').hidden })")
+                    print("record sensore:", r)
+                    ok = ok and r["fmt"] == ("ascii" if ascii_mode else "chords") and r["lv"] == "affidabile" and r["pr"] == "web-v1-30s" and r["src"] == "sensore" and r["raw"] and r["fs"] > 100
                     if out:
                         pg.screenshot(path=str(out / "sensore-fine.png"))
                 b.close()
