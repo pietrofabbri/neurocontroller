@@ -115,7 +115,6 @@ export class ArchivioLocale {
       if (typeof g[k] !== 'string' || !CODE.test(g[k])) err('campo ' + k + ': serve un codice anonimo tipo P01');
       const p = d.players.find((x) => x.code === g[k]);
       if (!p) err('giocatore ' + g[k] + ' sconosciuto');
-      if (g.source === 'sensore' && !p.consent) err('manca il consenso di ' + g[k] + ': compilare la scheda del partecipante');
     }
     if (!SOURCES.includes(g.source)) err("campo 'source' non valido");
     const row = { player_a: g.player_a, player_b: g.player_b, source: g.source };

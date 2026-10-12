@@ -93,12 +93,7 @@ $('del').onclick = async () => {
   try { await api.cancellaGiocatore(c); await aggiornaHome(); msgHome(c + ' cancellato.', 'ok'); } catch (e) { msgHome(e.message, 'err'); }
 };
 
-/* ------------------------------------------------------------------ scheda del partecipante e consenso */
-async function consensoMancante() {
-  const giocatori = await api.giocatori();
-  for (const c of [S.A, S.B]) { const p = giocatori.find((x) => x.code === c); if (!p || !p.consent) return c; }
-  return null;
-}
+/* ------------------------------------------------------------------ scheda del partecipante (tutta facoltativa, anche il consenso: non blocca mai il gioco) */
 let schedaCodice = null;
 async function apriScheda(codice) {
   if (!codice) { msgHome('Scegli prima un giocatore.', 'err'); return; }
@@ -135,10 +130,6 @@ $('avvia').onclick = async () => {
     S.A = $('selA').value; S.B = $('selB').value;
     if (!S.A || !S.B || S.A === S.B) { msgHome('Servono due giocatori diversi: A guida, B è la mente che scava.', 'err'); return; }
     S.persona = $('sorgente').value; S.durata = +$('durata').value;
-    if (S.persona === 'sensore') {
-      const manca = await consensoMancante();
-      if (manca) { msgHome('Per il sensore serve il consenso di ' + manca + ': apro la scheda.', 'err'); apriScheda(manca); return; }
-    }
     if (S.persona === 'sensore') { if (!S.flusso) S.flusso = new FlussoSensore($, { onGioca: (f) => avviaPartita(), onEsci: () => { S.flusso = null; mostra('home'); aggiornaHome(); } }); S.flusso.apri(); mostra('sensore'); return; }
     avviaPartita();
   } catch (e) { msgHome(e.message, 'err'); }

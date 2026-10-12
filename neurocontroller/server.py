@@ -286,12 +286,10 @@ class Store:
         series = _validate_series(data.get("series", []))
         with self._lock, self._tx() as c:
             for key in ("player_a", "player_b"):
-                row = c.execute("SELECT consent FROM players WHERE code = ?", (game[key],)).fetchone()
+                row = c.execute("SELECT 1 FROM players WHERE code = ?", (game[key],)).fetchone()
                 if not row:
                     raise ApiError(404, "giocatore %s sconosciuto" % game[key])
-                # con il sensore vero si registrano dati fisiologici: serve il consenso di tutti e due (o di chi ne ha la responsabilita')
-                if game["source"] == "sensore" and not row[0]:
-                    raise ApiError(409, "manca il consenso di %s: compilare la scheda del partecipante" % game[key])
+                # scheda e consenso sono facoltativi (decisione del docente, 12/10/2026): non bloccano mai la partita
             cols = list(game)
             cur = c.execute("INSERT INTO games(%s) VALUES (%s)" % (",".join(cols), ",".join("?" * len(cols))),
                             [game[k] for k in cols])

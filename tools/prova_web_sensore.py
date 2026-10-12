@@ -96,15 +96,7 @@ def main() -> int:
                 pg.select_option("#sorgente", "sensore")
                 pg.select_option("#durata", "20")
                 pg.select_option("#sorgente", "sensore")
-                pg.click("#avvia")                      # crea due giocatori, ma senza consenso il sensore non parte
-                pg.wait_for_selector("#scheda[open]", timeout=5000)
-                print("senza consenso la scheda si apre da sola:", pg.inner_text("#home-msg"))
-                for lato in ("A", "B"):
-                    if not pg.evaluate("document.getElementById('scheda').open"):
-                        pg.click("#scheda" + lato); pg.wait_for_selector("#scheda[open]")
-                    pg.check("#sc-consenso"); pg.select_option("#sc-da", "persona"); pg.click("#sc-salva"); pg.wait_for_timeout(500)
-                pg.select_option("#durata", "20")
-                pg.click("#avvia")
+                pg.click("#avvia")                      # scheda e consenso sono facoltativi: il sensore parte subito
                 pg.wait_for_selector("#sensore:not([hidden])")
                 pg.check("#s-ok")
                 pg.click("#s-collega")

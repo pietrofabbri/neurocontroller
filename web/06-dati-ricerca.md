@@ -25,12 +25,12 @@ Nessuna di queste domande è risolta: il progetto produce i dati, non conclusion
 - Sul computer che si usa per giocare: `python3 -m neurocontroller serve` scrive un file SQLite (`data/web/giochi.sqlite3`, ignorato da Git). Il sito pubblicato senza server salva invece nel browser (stessi campi, stesse regole) e permette di scaricare il CSV.
 - Esportazione: `/api/export.csv` (una riga per partita, con le schede di A e di B in colonne con prefisso `a_` e `b_`) e `/api/export-series.csv` (tutte le serie, colonna `game_id` per collegarle).
 - Persone: solo codici `P01`, `P02`… Mai nomi. Il server e il browser rifiutano ogni altro formato.
-- Prima di giocare con il sensore vero **devono avere il consenso registrato sia A sia B** (o chi ne ha la responsabilità, per i minorenni). Il server risponde 409 se manca; il browser blocca prima di collegare il sensore. Con il segnale simulato non serve.
+- **Il consenso registrato è facoltativo** (decisione del docente, 12/10/2026): né il server né il browser bloccano più una partita o una calibrazione se manca. La casella resta per chi vuole documentarlo; per i minorenni la scuola decide come raccogliere l'autorizzazione fuori dall'app. Chi analizza i dati deve considerare che `consent = 0` può significare "non registrato" e non "rifiutato".
 - Le partite con segnale simulato sono marcate `simulata` in `source` e **non vanno mai mescolate** con quelle reali nelle analisi.
 
 ## 3. Tabella `players` (una riga per persona, scheda anonima)
 
-Tutte le risposte sono a scelta chiusa: niente testo libero, così non entrano per sbaglio nomi o dati sanitari. Tutte facoltative tranne il consenso per il sensore. "nd" significa "preferisco non dirlo".
+Tutte le risposte sono a scelta chiusa: niente testo libero, così non entrano per sbaglio nomi o dati sanitari. Tutte facoltative, consenso compreso. "nd" significa "preferisco non dirlo".
 
 | Colonna | Tipo | Valori e significato |
 |---|---|---|

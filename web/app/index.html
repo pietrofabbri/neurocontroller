@@ -60,10 +60,10 @@
         <ul>
           <li>Lo stato di B è una <b>stima</b> fatta da un sensore economico. È un esperimento per capire cosa possiamo e cosa non possiamo misurare. <b>Non è un dispositivo medico.</b></li>
           <li>Finché la scritta <b>SEGNALE SIMULATO</b> è accesa, nessun cervello è misurato: un programma finge di essere B.</li>
-          <li>Con il sensore vero: per i minorenni serve il consenso di chi ne ha la responsabilità; si può smettere in qualsiasi momento; computer <b>a batteria</b>, scollegato dal caricatore; seguire le istruzioni del produttore; elettrodi solo su pelle integra.</li>
+          <li>Con il sensore vero: per i minorenni conviene avere il consenso di chi ne ha la responsabilità (la scuola decide come); si può smettere in qualsiasi momento; computer <b>a batteria</b>, scollegato dal caricatore; seguire le istruzioni del produttore; elettrodi solo su pelle integra.</li>
           <li>Se il segnale è sporco (occhi chiusi forte, mascella, cavo mosso) la talpa <b>non</b> prende punti: stringere i denti non fa vincere.</li>
           <li>Si usano solo codici (P01, P02…), mai nomi. I dati restano su questo computer.</li>
-          <li>Per giocare con il sensore serve la <b>scheda</b> compilata e il <b>consenso</b> di A e di B (o di chi ne ha la responsabilità). Nella scheda ci sono solo risposte a scelta: età, genere, mano, abitudini di gioco e di musica. Nessun dato sanitario.</li>
+          <li>La <b>scheda</b> del giocatore (età, genere, mano, abitudini di gioco e di musica) è <b>facoltativa</b>: si può giocare e calibrare anche senza compilarla, ma i dati serviranno meno alla ricerca. Solo risposte a scelta, nessun dato sanitario.</li>
         </ul></details>
     </div>
 
@@ -93,7 +93,7 @@
       <ul>
         <li>Il computer deve essere <b>a batteria</b>, <b>scollegato dal caricatore</b> (e lontano da cavi di rete). <span id="s-batt" class="muted"></span></li>
         <li>Segui le istruzioni del produttore del sensore. Elettrodi solo su pelle integra.</li>
-        <li>Se B è minorenne serve il <b>consenso</b> di chi ne ha la responsabilità. Si può interrompere in qualsiasi momento.</li>
+        <li>Se B è minorenne conviene avere il <b>consenso</b> di chi ne ha la responsabilità. Si può interrompere in qualsiasi momento.</li>
         <li>È un esperimento: lo stato di B è una <b>stima</b>, non una misura medica.</li>
       </ul>
       <label class="inline"><input id="s-ok" type="checkbox"> Ho letto e va bene (batteria, consenso, istruzioni del produttore)</label>
@@ -202,7 +202,7 @@
 <dialog id="scheda" aria-labelledby="sc-titolo">
   <form method="dialog" id="sc-form">
     <h2 id="sc-titolo">Scheda di <span id="sc-codice"></span></h2>
-    <p class="muted">Solo risposte a scelta, tutte facoltative tranne il consenso per giocare con il sensore. Nessun nome, nessun dato sanitario. I dati restano su questo computer e si possono cancellare in qualsiasi momento (Gestione dei giocatori).</p>
+    <p class="muted">Solo risposte a scelta, tutte facoltative, consenso compreso: non serve compilarla per giocare. Nessun nome, nessun dato sanitario. I dati restano su questo computer e si possono cancellare in qualsiasi momento (Gestione dei giocatori).</p>
     <div class="row wrap">
       <label>Età (anni) <input id="sc-eta" type="number" min="5" max="99" step="1"></label>
       <label>Genere <select id="sc-genere"><option value="">—</option><option value="donna">donna</option><option value="uomo">uomo</option><option value="altro">altro</option><option value="nd">preferisco non dirlo</option></select></label>

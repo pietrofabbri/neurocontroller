@@ -178,26 +178,19 @@ class ServerTests(unittest.TestCase):
         self.assertIn("age_years", lst["players"][0])
         self.assertIn("consent", lst["players"][0])
 
-    def test_sensor_games_need_consent_of_both_players(self):
+    def test_sensor_games_do_not_need_consent_or_player_card(self):
         for code in ("P51", "P52"):
             self.call("POST", "/api/players", {"code": code})
         game = _game(player_a="P51", player_b="P52", source="sensore", signal_fs_hz=193.4, sensor_format="ascii",
                      sensor_baud=9600, profile_level="affidabile", profile_dprime=2.1, profile_accuracy=0.9,
                      calib_protocol="web-v1-30s", b_sleep_h=7.5, b_caffeine_3h=0, b_fatigue=2, app_version="W0.2")
-        status, body = self.call("POST", "/api/games", game)
-        self.assertEqual(status, 409)
-        self.assertIn("P51", body["error"])
-        self.call("PUT", "/api/players/P51", {"consent": 1, "consent_by": "persona"})
-        status, body = self.call("POST", "/api/games", game)
-        self.assertEqual(status, 409)
-        self.assertIn("P52", body["error"])
-        self.call("PUT", "/api/players/P52", {"consent": 1, "consent_by": "genitore_tutore"})
+        # nessuna scheda e nessun consenso registrato: la partita con il sensore si salva lo stesso
         status, body = self.call("POST", "/api/games", game)
         self.assertEqual(status, 201)
         _, lst = self.call("GET", "/api/games?player=P52")
         g = lst["games"][0]
         self.assertEqual((g["signal_fs_hz"], g["sensor_format"], g["b_fatigue"]), (193.4, "ascii", 2))
-        # la partita simulata non ha bisogno di consenso e lascia vuoti i campi tecnici del sensore
+        # la partita simulata lascia vuoti i campi tecnici del sensore
         self.call("POST", "/api/players", {"code": "P53"})
         self.call("POST", "/api/players", {"code": "P54"})
         status, _ = self.call("POST", "/api/games", _game(player_a="P53", player_b="P54"))

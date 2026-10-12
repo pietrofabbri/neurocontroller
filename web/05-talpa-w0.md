@@ -130,7 +130,7 @@ vecchie partite restano, il timbro `softness` = 1 − vecchia luminosita', i vec
 consenso). Tre tabelle: `players` (scheda anonima: eta', genere, mano, videogiochi, musica, contesto,
 **consenso**), `games` (una riga per partita: risultato, coerenza, disturbi per motivo, musica media, metadati del
 sensore e del profilo, condizioni di B: sonno, caffe', stanchezza) e `game_series` (una riga al secondo).
-**Con il sensore vero servono il consenso registrato di A e di B** (409 dal server, blocco nella pagina);
+**Scheda e consenso sono facoltativi, anche con il sensore vero** (decisione del docente, 12/10/2026: la scheda obbligatoria impediva di far partire la calibrazione; nessun 409, nessun blocco nella pagina; resta registrabile per chi vuole);
 il segnale grezzo **non** si archivia. **Dizionario completo, definizioni, limiti ed etica: `06-dati-ricerca.md`**
 (un test controlla che ogni colonna sia descritta). API: `GET/POST /api/players`, `PUT /api/players/<codice>`
 (scheda e consenso), `/api/games`, `/api/leaderboard`, `/api/export.csv` (partite + schede di A e B),

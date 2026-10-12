@@ -56,14 +56,10 @@ test('scheda del partecipante: solo risposte a scelta; consenso esplicito e riti
   assert.strictEqual(r.consent, 0); assert.strictEqual(r.consent_at, null); assert.strictEqual(r.consent_by, null);
   assert.throws(() => a.aggiornaGiocatore('P09', {}), /sconosciuto/);
 });
-test('con il sensore vero serve il consenso di A e di B; con il simulato no', () => {
+test('il consenso e la scheda sono facoltativi: anche con il sensore vero si salva', () => {
   const a = new ArchivioLocale(mem()); a.nuovoGiocatore(); a.nuovoGiocatore();
-  assert.throws(() => a.salvaPartita(partita('P01', 'P02', { source: 'sensore' })), /consenso di P01/);
-  a.aggiornaGiocatore('P01', { consent: 1, consent_by: 'persona' });
-  assert.throws(() => a.salvaPartita(partita('P01', 'P02', { source: 'sensore' })), /consenso di P02/);
-  a.aggiornaGiocatore('P02', { consent: 1, consent_by: 'persona' });
   assert.strictEqual(a.salvaPartita(partita('P01', 'P02', { source: 'sensore', signal_fs_hz: 193.4, sensor_format: 'ascii', sensor_baud: 9600, profile_level: 'affidabile', b_fatigue: 3, b_caffeine_3h: 0 })), 1);
-  assert.strictEqual(a.salvaPartita(partita('P01', 'P02')), 2);                 // simulata: nessun vincolo
+  assert.strictEqual(a.salvaPartita(partita('P01', 'P02')), 2);                 // simulata: stesso trattamento
   assert.strictEqual(a.partite(null)[1].signal_fs_hz, 193.4);
   assert.strictEqual(a.partite(null)[0].signal_fs_hz, null);
 });
